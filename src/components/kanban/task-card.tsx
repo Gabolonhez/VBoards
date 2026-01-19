@@ -63,9 +63,16 @@ export function TaskCard({ task, project, onClick, onDelete, selected, onToggleS
                     <span className="text-xs font-mono text-muted-foreground">{task.code}</span>
                 </div>
                 {project && (
-                    <Badge variant="outline" className="h-5 px-1 text-[10px]" style={{ color: project.color, borderColor: project.color }}>
-                        {project.prefix}
-                    </Badge>
+                    <div className="flex gap-1">
+                        {task.version && (
+                            <Badge variant="outline" className="h-5 px-1 text-[10px] bg-muted/50 text-muted-foreground border-border">
+                                {task.version.name}
+                            </Badge>
+                        )}
+                        <Badge variant="outline" className="h-5 px-1 text-[10px]" style={{ color: project.color, borderColor: project.color }}>
+                            {project.prefix}
+                        </Badge>
+                    </div>
                 )}
             </div>
 

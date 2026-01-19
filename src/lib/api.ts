@@ -88,7 +88,8 @@ export async function getTasks(): Promise<Task[]> {
         .from("tasks")
         .select(`
       *,
-      assignee:team_members(*)
+      assignee:team_members(*),
+      version:versions(*)
     `)
         .order("created_at", { ascending: false });
 
@@ -98,7 +99,8 @@ export async function getTasks(): Promise<Task[]> {
         ...t,
         projectId: t.project_id,
         versionId: t.version_id,
-        assignee: t.assignee ? { ...t.assignee, avatarUrl: t.assignee.avatar_url } : undefined
+        assignee: t.assignee ? { ...t.assignee, avatarUrl: t.assignee.avatar_url } : undefined,
+        version: t.version ? { ...t.version, projectId: t.version.project_id, releaseDate: t.version.release_date, ownerId: t.version.owner_id } : undefined
     }));
 }
 
@@ -137,6 +139,7 @@ export async function createTask(task: Partial<Task>): Promise<Task> {
         title: task.title,
         description: task.description,
         status: task.status,
+        images: task.images,
         priority: task.priority,
         code: task.code || `TASK-${Math.floor(Math.random() * 10000)}`,
         assignee_id: task.assigneeId

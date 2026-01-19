@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/kanban/column";
 import { TaskModal } from "@/components/kanban/task-modal";
-import { Task, Project, TaskStatus } from "@/types";
-import { getTasks, getProjects, updateTaskStatus, deleteTask } from "@/lib/api";
+import { Task, Project, Version, TaskStatus } from "@/types";
+import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask } from "@/lib/api";
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -36,6 +36,7 @@ import {
 export default function BoardPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [versions, setVersions] = useState<Version[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -49,6 +50,7 @@ export default function BoardPage() {
 
     const [searchQuery, setSearchQuery] = useState("");
     const [priorityFilter, setPriorityFilter] = useState<string>("all");
+    const [versionFilter, setVersionFilter] = useState<string>("all");
 
     const [visibleColumns, setVisibleColumns] = useState<TaskStatus[]>([
         "ideas", "backlog", "in_progress", "code_review", "done", "deployed"
@@ -97,9 +99,10 @@ export default function BoardPage() {
 
     async function fetchData() {
         try {
-            const [t, p] = await Promise.all([getTasks(), getProjects()]);
+            const [t, p, v] = await Promise.all([getTasks(), getProjects(), getVersions()]);
             setTasks(t);
             setProjects(p);
+            setVersions(v);
         } catch (e) {
             console.error(e);
         } finally {
@@ -207,13 +210,17 @@ export default function BoardPage() {
 
     const { selectedProjectId } = useProject();
 
-    // Filter tasks based on selected project
     const filteredTasks = tasks.filter(t => {
         const matchesProject = selectedProjectId ? t.projectId === selectedProjectId : true;
         const matchesSearch = searchQuery ? t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.code && t.code.toLowerCase().includes(searchQuery.toLowerCase())) : true;
         const matchesPriority = priorityFilter !== "all" ? t.priority === priorityFilter : true;
-        return matchesProject && matchesSearch && matchesPriority;
+        const matchesVersion = versionFilter !== "all" ? t.versionId === versionFilter : true;
+        return matchesProject && matchesSearch && matchesPriority && matchesVersion;
     });
+
+    const filteredVersions = selectedProjectId 
+        ? versions.filter(v => v.projectId === selectedProjectId) 
+        : versions;
 
     // Filter columns if needed? No, just tasks.
 
@@ -271,6 +278,20 @@ export default function BoardPage() {
                                 <SelectItem value="medium">{t('board.medium')}</SelectItem>
                                 <SelectItem value="high">{t('board.high')}</SelectItem>
                                 <SelectItem value="critical">{t('board.critical')}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">{t('common.version')}:</span>
+                        <Select value={versionFilter} onValueChange={setVersionFilter}>
+                            <SelectTrigger className="w-[180px] h-8">
+                                <SelectValue placeholder={t('common.all_versions')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">{t('common.all_versions')}</SelectItem>
+                                {filteredVersions.map(v => (
+                                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>

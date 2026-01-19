@@ -45,6 +45,7 @@ export interface Task {
   code: string;
   projectId: string;
   versionId?: string;
+  version?: Version;
   title: string;
   description?: string;
   status: TaskStatus;
