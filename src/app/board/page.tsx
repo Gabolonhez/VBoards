@@ -13,6 +13,14 @@ import { useLanguage } from "@/context/language-context";
 import { Plus, Loader2, Settings2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
+import { Input } from "@/components/ui/input";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -38,6 +46,9 @@ export default function BoardPage() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const { t } = useLanguage();
     const { toast } = useToast();
+
+    const [searchQuery, setSearchQuery] = useState("");
+    const [priorityFilter, setPriorityFilter] = useState<string>("all");
 
     const [visibleColumns, setVisibleColumns] = useState<TaskStatus[]>([
         "ideas", "backlog", "in_progress", "code_review", "done", "deployed"
@@ -197,9 +208,12 @@ export default function BoardPage() {
     const { selectedProjectId } = useProject();
 
     // Filter tasks based on selected project
-    const filteredTasks = tasks.filter(t =>
-        selectedProjectId ? t.projectId === selectedProjectId : true
-    );
+    const filteredTasks = tasks.filter(t => {
+        const matchesProject = selectedProjectId ? t.projectId === selectedProjectId : true;
+        const matchesSearch = searchQuery ? t.title.toLowerCase().includes(searchQuery.toLowerCase()) || (t.code && t.code.toLowerCase().includes(searchQuery.toLowerCase())) : true;
+        const matchesPriority = priorityFilter !== "all" ? t.priority === priorityFilter : true;
+        return matchesProject && matchesSearch && matchesPriority;
+    });
 
     // Filter columns if needed? No, just tasks.
 
@@ -207,34 +221,59 @@ export default function BoardPage() {
 
     return (
         <div className="flex flex-col h-full overflow-hidden bg-background">
-            <header className="flex items-center justify-between h-16 px-6 border-b shrink-0">
-                <h1 className="text-lg font-semibold">{t('board.title')}</h1>
+            <header className="flex flex-col gap-4 py-4 px-6 border-b shrink-0 bg-card/50">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-lg font-semibold">{t('board.title')}</h1>
+                    <div className="flex items-center gap-2">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="outline" size="sm" className="gap-2">
+                                    <Settings2 className="h-4 w-4" />
+                                    <span className="hidden sm:inline">{t('board.view')}</span>
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>{t('board.toggle_columns')}</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {COLUMNS.map((col) => (
+                                    <DropdownMenuCheckboxItem
+                                        key={col.id}
+                                        checked={visibleColumns.includes(col.id)}
+                                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                        onCheckedChange={(_checked) => toggleColumn(col.id)}
+                                    >
+                                        {col.title}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button onClick={handleNewTask} size="sm" className="gap-2">
+                            <Plus className="h-4 w-4" /> {t('common.new_task')}
+                        </Button>
+                    </div>
+                </div>
                 <div className="flex items-center gap-2">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-2">
-                                <Settings2 className="h-4 w-4" />
-                                <span className="hidden sm:inline">{t('board.view')}</span>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>{t('board.toggle_columns')}</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            {COLUMNS.map((col) => (
-                                <DropdownMenuCheckboxItem
-                                    key={col.id}
-                                    checked={visibleColumns.includes(col.id)}
-                                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                    onCheckedChange={(_checked) => toggleColumn(col.id)}
-                                >
-                                    {col.title}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button onClick={handleNewTask} size="sm" className="gap-2">
-                        <Plus className="h-4 w-4" /> {t('common.new_task')}
-                    </Button>
+                    <Input
+                        placeholder={t('board.filter_tasks')}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="max-w-[300px] h-8"
+                    />
+                    <div className="flex items-center gap-2">
+                         <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">{t('common.priority')}:</span>
+                        <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                            <SelectTrigger className="w-[180px] h-8">
+                                <SelectValue placeholder={t('common.priority')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">{t('common.all_projects') === "All Projects" ? "All Priorities" : "Todas Prioridades"}</SelectItem>
+                                <SelectItem value="low">{t('board.low')}</SelectItem>
+                                <SelectItem value="medium">{t('board.medium')}</SelectItem>
+                                <SelectItem value="high">{t('board.high')}</SelectItem>
+                                <SelectItem value="critical">{t('board.critical')}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
             </header>
 

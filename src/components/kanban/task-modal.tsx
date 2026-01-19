@@ -6,7 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Task, Project, Version, TeamMember, TaskStatus, TaskPriority } from "@/types";
 import { createTask, updateTask, getProjects, getVersions, getMembers } from "@/lib/api";
-import { Loader2 } from "lucide-react";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/context/language-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +31,7 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
     const { t } = useLanguage();
     const [submitting, setSubmitting] = useState(false);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
     const [versions, setVersions] = useState<Version[]>([]);
     const [members, setMembers] = useState<TeamMember[]>([]);
 
@@ -43,52 +52,84 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                 setProjects(p);
                 setVersions(v);
                 setMembers(m);
+                
+                if (task) {
+                    setSelectedProjectIds([task.projectId]);
+                    setFormData({
+                        title: task.title,
+                        description: task.description || "",
+                        status: task.status,
+                        priority: task.priority,
+                        projectId: task.projectId,
+                        versionId: task.versionId || "",
+                        assigneeId: task.assigneeId || "none",
+                        imageUrls: task.images?.join('\n') || ""
+                    });
+                } else {
+                    const defaultProject = p.length > 0 ? [p[0].id] : [];
+                    setSelectedProjectIds(defaultProject);
+                    setFormData({
+                        title: "",
+                        description: "",
+                        status: "ideas",
+                        priority: "medium",
+                        projectId: defaultProject[0] || "",
+                        versionId: "",
+                        assigneeId: "none",
+                        imageUrls: ""
+                    });
+                }
             });
-            if (task) {
-                setFormData({
-                    title: task.title,
-                    description: task.description || "",
-                    status: task.status,
-                    priority: task.priority,
-                    projectId: task.projectId,
-                    versionId: task.versionId || "",
-                    assigneeId: task.assigneeId || "none",
-                    imageUrls: task.images?.join('\n') || ""
-                });
-            } else {
-                setFormData({
-                    title: "",
-                    description: "",
-                    status: "ideas",
-                    priority: "medium",
-                    projectId: projects[0]?.id || "",
-                    versionId: "",
-                    assigneeId: "none",
-                    imageUrls: ""
-                });
-            }
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, task]);
 
+    const toggleProject = (projectId: string) => {
+        // If editing existing task, do not allow multi-select or changing project easily (complex)
+        // allowing checking only if it's new task
+        if (task) return; 
+
+        setSelectedProjectIds(prev => {
+           const next = prev.includes(projectId)
+             ? prev.filter(id => id !== projectId)
+             : [...prev, projectId];
+           
+           // Update formData.projectId to the first selected one for compatibility with version filter
+           if (next.length > 0) {
+               setFormData(fd => ({ ...fd, projectId: next[0] }));
+           }
+           return next;
+        });
+    };
+
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         setSubmitting(true);
+        if (selectedProjectIds.length === 0) {
+            toast({ title: "Error", description: "Select at least one project", variant: "destructive" });
+            setSubmitting(false);
+            return;
+        }
+
         try {
-            const data = {
+            const dataTemplate = {
                 ...formData,
                 assigneeId: formData.assigneeId === "none" ? undefined : formData.assigneeId,
-                versionId: formData.versionId === "" ? undefined : formData.versionId,
+                versionId: formData.versionId === "" || selectedProjectIds.length > 1 ? undefined : formData.versionId, // Clear version if multi-project
                 images: formData.imageUrls.split('\n').filter(url => url.trim().length > 0)
             };
             
             // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { imageUrls, ...taskData } = data;
+            const { imageUrls, ...taskData } = dataTemplate;
 
             if (task) {
-                await updateTask(task.id, taskData);
+                // Update single task
+                await updateTask(task.id, { ...taskData, projectId: selectedProjectIds[0] });
             } else {
-                await createTask(taskData);
+                // Create multiple tasks
+                await Promise.all(selectedProjectIds.map(pid => 
+                    createTask({ ...taskData, projectId: pid })
+                ));
             }
             toast({ title: t('common.success'), description: "Task saved" });
             onSuccess();
@@ -132,24 +173,50 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label>{t('common.project')}</Label>
-                            <Select value={formData.projectId} onValueChange={v => setFormData({ ...formData, projectId: v })}>
-                                <SelectTrigger><SelectValue placeholder={t('common.select_project')} /></SelectTrigger>
-                                <SelectContent>
-                                    {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            {task ? (
+                                <Select value={selectedProjectIds[0]} disabled>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                </Select>
+                            ) : (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" className="w-full justify-between font-normal">
+                                            {selectedProjectIds.length === 0 ? t('common.select_project') :
+                                             selectedProjectIds.length === 1 ? projects.find(p => p.id === selectedProjectIds[0])?.name :
+                                             `${selectedProjectIds.length} projects selected`}
+                                            <ChevronDown className="h-4 w-4 opacity-50" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent className="w-[200px]">
+                                        {projects.map(p => (
+                                            <DropdownMenuCheckboxItem
+                                                key={p.id}
+                                                checked={selectedProjectIds.includes(p.id)}
+                                                onCheckedChange={() => toggleProject(p.id)}
+                                            >
+                                                {p.name}
+                                            </DropdownMenuCheckboxItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </div>
                         <div className="space-y-2">
                             <Label>{t('roadmap.title')}</Label>
-                            <Select value={formData.versionId} onValueChange={v => setFormData({ ...formData, versionId: v })}>
+                            <Select 
+                                value={formData.versionId} 
+                                onValueChange={v => setFormData({ ...formData, versionId: v })}
+                                disabled={selectedProjectIds.length > 1}
+                            >
                                 <SelectTrigger><SelectValue placeholder={t('common.none')} /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">{t('common.none')}</SelectItem>
-                                    {versions.filter(v => !formData.projectId || v.projectId === formData.projectId).map(v => (
+                                    {versions.filter(v => selectedProjectIds.length === 1 && v.projectId === selectedProjectIds[0]).map(v => (
                                         <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {selectedProjectIds.length > 1 && <p className="text-[10px] text-muted-foreground">Version disabled for multiple projects</p>}
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
