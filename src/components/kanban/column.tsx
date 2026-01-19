@@ -13,9 +13,11 @@ interface KanbanColumnProps {
     projects: Project[];
     onTaskClick: (task: Task) => void;
     onDelete: (id: string) => void;
+    selectedTaskIds?: string[];
+    onToggleSelect?: (id: string) => void;
 }
 
-export function KanbanColumn({ id, title, tasks, projects, onTaskClick, onDelete }: KanbanColumnProps) {
+export function KanbanColumn({ id, title, tasks, projects, onTaskClick, onDelete, selectedTaskIds, onToggleSelect }: KanbanColumnProps) {
     const { setNodeRef, isOver } = useDroppable({
         id: id,
     });
@@ -43,6 +45,8 @@ export function KanbanColumn({ id, title, tasks, projects, onTaskClick, onDelete
                         project={projects.find(p => p.id === task.projectId)}
                         onClick={onTaskClick}
                         onDelete={onDelete}
+                        selected={selectedTaskIds?.includes(task.id)}
+                        onToggleSelect={onToggleSelect}
                     />
                 ))}
             </div>

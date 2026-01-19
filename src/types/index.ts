@@ -53,6 +53,7 @@ export interface Task {
   assignee?: TeamMember;
   createdAt?: string;
   updatedAt?: string;
+  images?: string[];
 }
 
 export interface Doc {

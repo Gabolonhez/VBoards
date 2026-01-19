@@ -5,7 +5,7 @@ export const translations = {
         common: {
             dashboard: "Dashboard",
             board: "Board",
-            roadmap: "Roadmap",
+            roadmap: "Versions",
             processes: "Processes",
             apps: "Apps",
             settings: "Settings",
@@ -73,10 +73,12 @@ export const translations = {
             low: "Low",
             medium: "Medium",
             high: "High",
-            critical: "Critical"
+            critical: "Critical",
+            view: "Columns",
+            toggle_columns: "Toggle Columns"
         },
         roadmap: {
-            title: "Roadmap",
+            title: "Versions",
             subtitle: "Manage project versions and releases",
             version_name: "Version Name",
             release_date: "Release Date",
@@ -85,7 +87,7 @@ export const translations = {
             in_stores: "In Stores",
             deprecated: "Deprecated",
             create_version: "Create Version",
-            create_desc: "Add a new version release to the roadmap.",
+            create_desc: "Add a new version release to Versions.",
             no_versions: "No versions found. Create one to get started.",
             version_created: "Version created successfully",
             version_deleted: "Version deleted",
@@ -193,7 +195,7 @@ export const translations = {
         common: {
             dashboard: "Dashboard",
             board: "Quadro",
-            roadmap: "Roadmap",
+            roadmap: "Versões",
             processes: "Processos",
             apps: "Apps",
             settings: "Configurações",
@@ -261,10 +263,12 @@ export const translations = {
             low: "Baixa",
             medium: "Média",
             high: "Alta",
-            critical: "Crítica"
+            critical: "Crítica",
+            view: "Colunas",
+            toggle_columns: "Alterar Colunas"
         },
         roadmap: {
-            title: "Roadmap",
+            title: "Versões",
             subtitle: "Gerencie versões e lançamentos do projeto",
             version_name: "Nome da Versão",
             release_date: "Data de Lançamento",
@@ -273,7 +277,7 @@ export const translations = {
             in_stores: "Nas Lojas",
             deprecated: "Descontinuado",
             create_version: "Criar Versão",
-            create_desc: "Adicionar uma nova versão ao roadmap.",
+            create_desc: "Adicionar uma nova versão.",
             no_versions: "Nenhuma versão encontrada. Crie uma para começar.",
             version_created: "Versão criada com sucesso",
             version_deleted: "Versão excluída",
@@ -450,7 +454,9 @@ export const translations = {
             low: "Baja",
             medium: "Media",
             high: "Alta",
-            critical: "Crítica"
+            critical: "Crítica",
+            view: "Columnas",
+            toggle_columns: "Cambiar columnas"
         },
         roadmap: {
             title: "Hoja de Ruta",

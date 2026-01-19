@@ -4,6 +4,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { Badge } from "@/components/ui/badge";
 import { Project, Task } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
 
@@ -14,9 +15,11 @@ interface TaskCardProps {
     project?: Project;
     onClick: (task: Task) => void;
     onDelete: (id: string) => void;
+    selected?: boolean;
+    onToggleSelect?: (id: string) => void;
 }
 
-export function TaskCard({ task, project, onClick, onDelete }: TaskCardProps) {
+export function TaskCard({ task, project, onClick, onDelete, selected, onToggleSelect }: TaskCardProps) {
     const { t } = useLanguage();
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: task.id,
@@ -36,11 +39,29 @@ export function TaskCard({ task, project, onClick, onDelete }: TaskCardProps) {
             onClick={() => onClick(task)}
             className={cn(
                 "group bg-card p-3 rounded-md border shadow-sm cursor-grab active:cursor-grabbing hover:border-primary/50 transition-colors space-y-3 relative",
-                isDragging && "opacity-50 ring-2 ring-primary ring-offset-2"
+                isDragging && "opacity-50 ring-2 ring-primary ring-offset-2",
+                selected && "border-primary ring-1 ring-primary"
             )}
         >
+            {task.images && task.images.length > 0 && (
+                <div className="rounded-sm overflow-hidden mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={task.images[0]} alt="Task cover" className="w-full h-32 object-cover" />
+                </div>
+            )}
+            
             <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-mono text-muted-foreground">{task.code}</span>
+                <div className="flex items-center gap-2">
+                    {onToggleSelect && (
+                         <Checkbox 
+                            checked={selected}
+                            onCheckedChange={() => onToggleSelect(task.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            className={cn("h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity", selected && "opacity-100")}
+                         />
+                    )}
+                    <span className="text-xs font-mono text-muted-foreground">{task.code}</span>
+                </div>
                 {project && (
                     <Badge variant="outline" className="h-5 px-1 text-[10px]" style={{ color: project.color, borderColor: project.color }}>
                         {project.prefix}

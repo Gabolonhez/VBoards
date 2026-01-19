@@ -33,7 +33,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
         priority: "medium" as TaskPriority,
         projectId: "",
         versionId: "",
-        assigneeId: "none"
+        assigneeId: "none",
+        imageUrls: ""
     });
 
     useEffect(() => {
@@ -51,7 +52,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                     priority: task.priority,
                     projectId: task.projectId,
                     versionId: task.versionId || "",
-                    assigneeId: task.assigneeId || "none"
+                    assigneeId: task.assigneeId || "none",
+                    imageUrls: task.images?.join('\n') || ""
                 });
             } else {
                 setFormData({
@@ -61,7 +63,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                     priority: "medium",
                     projectId: projects[0]?.id || "",
                     versionId: "",
-                    assigneeId: "none"
+                    assigneeId: "none",
+                    imageUrls: ""
                 });
             }
         }
@@ -75,13 +78,17 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
             const data = {
                 ...formData,
                 assigneeId: formData.assigneeId === "none" ? undefined : formData.assigneeId,
-                versionId: formData.versionId === "" ? undefined : formData.versionId
+                versionId: formData.versionId === "" ? undefined : formData.versionId,
+                images: formData.imageUrls.split('\n').filter(url => url.trim().length > 0)
             };
+            
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { imageUrls, ...taskData } = data;
 
             if (task) {
-                await updateTask(task.id, data);
+                await updateTask(task.id, taskData);
             } else {
-                await createTask(data);
+                await createTask(taskData);
             }
             toast({ title: t('common.success'), description: "Task saved" });
             onSuccess();
@@ -104,6 +111,23 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                     <div className="space-y-2">
                         <Label>{t('common.title')}</Label>
                         <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Description</Label>
+                        <textarea
+                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={formData.description}
+                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Images (URLs, one per line)</Label>
+                        <textarea
+                            className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            value={formData.imageUrls}
+                            onChange={e => setFormData({ ...formData, imageUrls: e.target.value })}
+                            placeholder="https://..."
+                        />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">

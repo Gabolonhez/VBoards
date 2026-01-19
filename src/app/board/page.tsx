@@ -10,10 +10,18 @@ import { getTasks, getProjects, updateTaskStatus, deleteTask } from "@/lib/api";
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
-import { Plus } from "lucide-react";
-import { Loader2 } from "lucide-react";
+import { Plus, Loader2, Settings2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 
@@ -26,9 +34,38 @@ export default function BoardPage() {
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
+    const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const { t } = useLanguage();
     const { toast } = useToast();
+
+    const [visibleColumns, setVisibleColumns] = useState<TaskStatus[]>([
+        "ideas", "backlog", "in_progress", "code_review", "done", "deployed"
+    ]);
+
+    useEffect(() => {
+        const saved = localStorage.getItem("flowos_board_columns");
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setVisibleColumns(parsed);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    }, []);
+
+    const toggleColumn = (colId: TaskStatus) => {
+        setVisibleColumns(prev => {
+            const next = prev.includes(colId)
+                ? prev.filter(id => id !== colId)
+                : [...prev, colId];
+            localStorage.setItem("flowos_board_columns", JSON.stringify(next));
+            return next;
+        });
+    };
 
     const COLUMNS: { id: TaskStatus; title: string }[] = [
         { id: "ideas", title: t('board.ideas') },
@@ -63,6 +100,32 @@ export default function BoardPage() {
         setDeleteTaskId(taskId);
     }
 
+    function handleToggleSelect(taskId: string) {
+        if (selectedTaskIds.includes(taskId)) {
+            setSelectedTaskIds(selectedTaskIds.filter(id => id !== taskId));
+        } else {
+            setSelectedTaskIds([...selectedTaskIds, taskId]);
+        }
+    }
+
+    async function handleBulkStatusChange(status: TaskStatus) {
+        setTasks(prev => prev.map(t =>
+            selectedTaskIds.includes(t.id) ? { ...t, status } : t
+        ));
+
+        const idsToUpdate = [...selectedTaskIds];
+        setSelectedTaskIds([]);
+
+        try {
+            await Promise.all(idsToUpdate.map(id => updateTaskStatus(id, status)));
+            toast({ title: t('common.success'), description: "Tasks updated" });
+        } catch (e) {
+            console.error(e);
+            fetchData();
+            toast({ title: "Error", description: "Failed to update tasks", variant: "destructive" });
+        }
+    }
+
     async function confirmDelete() {
         if (!deleteTaskId) return;
         try {
@@ -90,15 +153,31 @@ export default function BoardPage() {
         const taskId = active.id as string;
         const newStatus = over.id as TaskStatus;
 
-        if (newStatus === tasks.find(t => t.id === taskId)?.status) return;
+        // Check if we are dragging a selected task
+        const isDraggingSelected = selectedTaskIds.includes(taskId);
+        const tasksToMove = isDraggingSelected ? selectedTaskIds : [taskId];
+
+        // Find tasks that actually need updating (exclude ones already in the column)
+        const relevantTaskIds = tasksToMove.filter(id => {
+            const task = tasks.find(t => t.id === id);
+            return task && task.status !== newStatus;
+        });
+
+        if (relevantTaskIds.length === 0) return;
 
         // Optimistic Update
         setTasks(prev => prev.map(t =>
-            t.id === taskId ? { ...t, status: newStatus } : t
+            relevantTaskIds.includes(t.id) ? { ...t, status: newStatus } : t
         ));
 
+        // Clear selection after move if it was a multi-select move? 
+        // Usually good UX to clear selection after a drop operation to verify it happened
+        if (isDraggingSelected) {
+            setSelectedTaskIds([]);
+        }
+
         try {
-            await updateTaskStatus(taskId, newStatus);
+            await Promise.all(relevantTaskIds.map(id => updateTaskStatus(id, newStatus)));
         } catch (e) {
             console.error("Failed to update status", e);
             fetchData(); // Revert on error
@@ -130,15 +209,39 @@ export default function BoardPage() {
         <div className="flex flex-col h-full overflow-hidden bg-background">
             <header className="flex items-center justify-between h-16 px-6 border-b shrink-0">
                 <h1 className="text-lg font-semibold">{t('board.title')}</h1>
-                <Button onClick={handleNewTask} size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" /> {t('common.new_task')}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-2">
+                                <Settings2 className="h-4 w-4" />
+                                <span className="hidden sm:inline">{t('board.view')}</span>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>{t('board.toggle_columns')}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {COLUMNS.map((col) => (
+                                <DropdownMenuCheckboxItem
+                                    key={col.id}
+                                    checked={visibleColumns.includes(col.id)}
+                                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                                    onCheckedChange={(_checked) => toggleColumn(col.id)}
+                                >
+                                    {col.title}
+                                </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button onClick={handleNewTask} size="sm" className="gap-2">
+                        <Plus className="h-4 w-4" /> {t('common.new_task')}
+                    </Button>
+                </div>
             </header>
 
             <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
                 <div className="flex-1 overflow-x-auto overflow-y-hidden">
                     <div className="flex h-full p-6 gap-6 min-w-max">
-                        {COLUMNS.map(col => (
+                        {COLUMNS.filter(col => visibleColumns.includes(col.id)).map(col => (
                             <KanbanColumn
                                 key={col.id}
                                 id={col.id}
@@ -147,11 +250,35 @@ export default function BoardPage() {
                                 projects={projects}
                                 onTaskClick={handleTaskClick}
                                 onDelete={handleDeleteTask}
+                                selectedTaskIds={selectedTaskIds}
+                                onToggleSelect={handleToggleSelect}
                             />
                         ))}
                     </div>
                 </div>
             </DndContext>
+
+            {selectedTaskIds.length > 0 && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-popover border shadow-lg rounded-full px-6 py-2 flex items-center gap-4 animate-in slide-in-from-bottom-5 z-20">
+                    <span className="text-sm font-medium">{selectedTaskIds.length} selected</span>
+                    <div className="h-4 w-px bg-border" />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">Move to...</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            {COLUMNS.map(col => (
+                                <DropdownMenuItem key={col.id} onClick={() => handleBulkStatusChange(col.id)}>
+                                    {col.title}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 ml-2" onClick={() => setSelectedTaskIds([])}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+            )}
 
             <TaskModal
                 open={isModalOpen}
