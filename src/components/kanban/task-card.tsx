@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Project, Task } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/context/language-context";
 
 import { Trash } from "lucide-react";
 
@@ -16,6 +17,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, project, onClick, onDelete }: TaskCardProps) {
+    const { t } = useLanguage();
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: task.id,
         data: task
@@ -50,7 +52,7 @@ export function TaskCard({ task, project, onClick, onDelete }: TaskCardProps) {
 
             <div className="flex items-center justify-between mt-2">
                 <Badge variant={task.priority === 'critical' ? 'destructive' : 'secondary'} className="text-[10px] h-5 px-1 capitalize">
-                    {task.priority}
+                    {t(`board.${task.priority}` as any)}
                 </Badge>
 
                 {task.assignee && (

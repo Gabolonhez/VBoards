@@ -1,7 +1,7 @@
 import { Task, TaskStatus, TaskPriority } from "@/types";
-import { getVersionById } from "@/data/mock-data";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useLanguage } from "@/context/language-context";
 
 interface RecentTasksProps {
     tasks: Task[];
@@ -23,22 +23,16 @@ const PRIORITY_COLORS: Record<TaskPriority, string> = {
     critical: "#ef4444",
 };
 
-const STATUS_LABELS: Record<Task["status"], string> = {
-    ideas: "ideas",
-    backlog: "backlog",
-    in_progress: "in progress",
-    code_review: "code review",
-    done: "done",
-    deployed: "deployed",
-};
-
 export function RecentTasks({ tasks }: RecentTasksProps) {
+    const { t } = useLanguage();
     return (
         <div className="bg-card rounded-xl border border-border p-5">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Recent Tasks</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-4">{t('dashboard.recent_activity')}</h2>
             <div className="space-y-3">
                 {tasks.map((task) => {
-                    const version = task.versionId ? getVersionById(task.versionId) : null;
+                    // Version lookup removed since we moved to backend and don't load all versions here
+                    // const version = task.versionId ? getVersionById(task.versionId) : null;
+                    const version = null; 
                     return (
                         <div
                             key={task.id}
@@ -58,21 +52,21 @@ export function RecentTasks({ tasks }: RecentTasksProps) {
                                             backgroundColor: `${STATUS_COLORS[task.status]}15`,
                                         }}
                                     >
-                                        {STATUS_LABELS[task.status]}
+                                        {t(`board.${task.status}` as any)}
                                     </Badge>
                                 </div>
                                 <p className="text-sm font-medium text-foreground mb-2 truncate group-hover:text-primary transition-colors">
                                     {task.title}
                                 </p>
                                 <div className="flex items-center gap-2">
-                                    {version && (
+                                    {/* {version && (
                                         <Badge
                                             variant="secondary"
                                             className="text-xs bg-primary/10 text-primary border-0"
                                         >
                                             {version.name}
                                         </Badge>
-                                    )}
+                                    )} */}
                                     <Badge
                                         variant="outline"
                                         className="text-xs capitalize"
@@ -81,7 +75,7 @@ export function RecentTasks({ tasks }: RecentTasksProps) {
                                             color: PRIORITY_COLORS[task.priority],
                                         }}
                                     >
-                                        {task.priority}
+                                        {t(`board.${task.priority}` as any)}
                                     </Badge>
                                 </div>
                             </div>
