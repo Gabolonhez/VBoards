@@ -48,10 +48,22 @@ export default function BoardPage() {
     const { t } = useLanguage();
     const { toast } = useToast();
 
-    const [searchQuery, setSearchQuery] = useState("");
-    const [priorityFilter, setPriorityFilter] = useState<string>("all");
-    const [versionFilter, setVersionFilter] = useState<string>("all");
-    const [sortBy, setSortBy] = useState<string>("created_at_desc");
+    const [searchQuery, setSearchQuery] = useState(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem("board_filter_search") || "";
+        return "";
+    });
+    const [priorityFilter, setPriorityFilter] = useState<string>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem("board_filter_priority") || "all";
+        return "all";
+    });
+    const [versionFilter, setVersionFilter] = useState<string>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem("board_filter_version") || "all";
+        return "all";
+    });
+    const [sortBy, setSortBy] = useState<string>(() => {
+        if (typeof window !== 'undefined') return localStorage.getItem("board_filter_sort") || "created_at_desc";
+        return "created_at_desc";
+    });
 
     const [visibleColumns, setVisibleColumns] = useState<TaskStatus[]>([
         "ideas", "backlog", "in_progress", "code_review", "done", "deployed"
@@ -70,6 +82,32 @@ export default function BoardPage() {
             }
         }
     }, []);
+
+    // Persistence Effects
+    useEffect(() => {
+        localStorage.setItem("board_filter_search", searchQuery);
+    }, [searchQuery]);
+
+    useEffect(() => {
+        localStorage.setItem("board_filter_priority", priorityFilter);
+    }, [priorityFilter]);
+
+    useEffect(() => {
+        localStorage.setItem("board_filter_version", versionFilter);
+    }, [versionFilter]);
+
+    useEffect(() => {
+        localStorage.setItem("board_filter_sort", sortBy);
+    }, [sortBy]);
+
+    const clearFilters = () => {
+        setSearchQuery("");
+        setPriorityFilter("all");
+        setVersionFilter("all");
+        setSortBy("created_at_desc");
+    };
+
+    const hasActiveFilters = searchQuery !== "" || priorityFilter !== "all" || versionFilter !== "all" || sortBy !== "created_at_desc";
 
     const toggleColumn = (colId: TaskStatus) => {
         setVisibleColumns(prev => {
@@ -237,8 +275,8 @@ export default function BoardPage() {
         return 0;
     });
 
-    const filteredVersions = selectedProjectId 
-        ? versions.filter(v => v.projectId === selectedProjectId) 
+    const filteredVersions = selectedProjectId
+        ? versions.filter(v => v.projectId === selectedProjectId)
         : versions;
 
     // Filter columns if needed? No, just tasks.
@@ -286,7 +324,7 @@ export default function BoardPage() {
                         className="max-w-[300px] h-8"
                     />
                     <div className="flex items-center gap-2">
-                         <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">{t('common.priority')}:</span>
+                        <span className="text-sm font-medium whitespace-nowrap hidden sm:inline">{t('common.priority')}:</span>
                         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
                             <SelectTrigger className="w-[180px] h-8">
                                 <SelectValue placeholder={t('common.priority')} />
@@ -328,6 +366,17 @@ export default function BoardPage() {
                             </SelectContent>
                         </Select>
                     </div>
+                    {hasActiveFilters && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={clearFilters}
+                            className="h-8 text-muted-foreground hover:text-foreground"
+                        >
+                            <X className="h-4 w-4 mr-2" />
+                            {t('board.clear_filters')}
+                        </Button>
+                    )}
                 </div>
             </header>
 

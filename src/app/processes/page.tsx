@@ -6,7 +6,7 @@ import { getDocs, createDoc, updateDoc, deleteDoc } from "@/lib/api";
 import { Doc, DocType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, FileText, Workflow, Save, Trash, Loader2, Circle, Square, Type, Diamond, X } from "lucide-react";
+import { Plus, FileText, Workflow, Save, Trash, Loader2, Circle, Square, Type, Diamond, X, Pencil } from "lucide-react";
 import ReactFlow, {
     addEdge,
     Background,
@@ -43,6 +43,7 @@ export default function ProcessesPage() {
     const [saving, setSaving] = useState(false);
     const [deleteDocId, setDeleteDocId] = useState<string | null>(null);
     const [createDocType, setCreateDocType] = useState<DocType | null>(null);
+    const [renameDocId, setRenameDocId] = useState<string | null>(null);
 
     // Editor State
     const [content, setContent] = useState("");
@@ -130,6 +131,23 @@ export default function ProcessesPage() {
 
     async function handleDelete(id: string) {
         setDeleteDocId(id);
+    }
+
+    async function handleRename(id: string) {
+        setRenameDocId(id);
+    }
+
+    async function confirmRename(newTitle: string) {
+        if (!renameDocId) return;
+        try {
+            await updateDoc(renameDocId, { title: newTitle });
+            setDocs(docs.map(d => d.id === renameDocId ? { ...d, title: newTitle } : d));
+            toast({ title: t('common.success'), description: t('processes.renamed_success') });
+        } catch (e) {
+            toast({ title: t('common.error'), description: t('processes.rename_error'), variant: "destructive" });
+        } finally {
+            setRenameDocId(null);
+        }
     }
 
     const [editNodeId, setEditNodeId] = useState<string | null>(null);
@@ -230,14 +248,26 @@ export default function ProcessesPage() {
                                 {doc.type === 'process' ? <Workflow className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                                 <span className="truncate">{doc.title}</span>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                                onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                            >
-                                <Trash className="h-3 w-3 text-destructive" />
-                            </Button>
+                            <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => { e.stopPropagation(); handleRename(doc.id); }}
+                                    title="Rename"
+                                >
+                                    <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                                    title="Delete"
+                                >
+                                    <Trash className="h-3 w-3 text-destructive" />
+                                </Button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -338,12 +368,24 @@ export default function ProcessesPage() {
             />
 
             <PromptDialog
+                isOpen={!!renameDocId}
+                onClose={() => setRenameDocId(null)}
+                onConfirm={confirmRename}
+                title={t('processes.rename_doc_title')}
+                description={t('processes.rename_doc_desc')}
+                placeholder={t('processes.rename_doc_placeholder')}
+                defaultValue={docs.find(d => d.id === renameDocId)?.title}
+                confirmText={t('common.save')}
+                cancelText={t('common.cancel')}
+            />
+
+            <PromptDialog
                 isOpen={!!editNodeId}
                 onClose={() => setEditNodeId(null)}
                 onConfirm={handleRenameNode}
-                title="Rename Node"
-                description="Enter a new label for this node:"
-                placeholder="Node Label"
+                title={t('processes.rename_node_title')}
+                description={t('processes.rename_node_desc')}
+                placeholder={t('processes.rename_node_placeholder')}
                 defaultValue={nodes.find(n => n.id === editNodeId)?.data.label}
                 confirmText={t('common.save')}
                 cancelText={t('common.cancel')}

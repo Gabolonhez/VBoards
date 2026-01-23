@@ -77,7 +77,8 @@ export const translations = {
             high: "High",
             critical: "Critical",
             view: "Columns",
-            toggle_columns: "Toggle Columns"
+            toggle_columns: "Toggle Columns",
+            clear_filters: "Clear Filters"
         },
         roadmap: {
             title: "Versions",
@@ -142,6 +143,14 @@ export const translations = {
             placeholder: "Type content here...",
             type_document: "Document",
             type_process: "Process Flow",
+            rename_doc_title: "Rename Document",
+            rename_doc_desc: "Enter a new title for this document:",
+            rename_doc_placeholder: "Document Title",
+            rename_node_title: "Rename Node",
+            rename_node_desc: "Enter a new label for this node:",
+            rename_node_placeholder: "Node Label",
+            renamed_success: "Document renamed successfully",
+            rename_error: "Failed to rename document"
         },
         settings: {
             title: "Settings",
@@ -269,7 +278,8 @@ export const translations = {
             high: "Alta",
             critical: "Crítica",
             view: "Colunas",
-            toggle_columns: "Alterar Colunas"
+            toggle_columns: "Alterar Colunas",
+            clear_filters: "Limpar Filtros"
         },
         roadmap: {
             title: "Versões",
@@ -333,7 +343,15 @@ export const translations = {
             delete_error: "Falha ao excluir",
             placeholder: "Digite o conteúdo aqui...",
             type_document: "Documento",
-            type_process: "Fluxo de Processo"
+            type_process: "Fluxo de Processo",
+            rename_doc_title: "Renomear Documento",
+            rename_doc_desc: "Digite um novo título para este documento:",
+            rename_doc_placeholder: "Título do Documento",
+            rename_node_title: "Renomear Nó",
+            rename_node_desc: "Digite um novo rótulo para este nó:",
+            rename_node_placeholder: "Rótulo do Nó",
+            renamed_success: "Documento renomeado com sucesso",
+            rename_error: "Falha ao renomear documento"
         },
 
         settings: {
@@ -462,7 +480,8 @@ export const translations = {
             high: "Alta",
             critical: "Crítica",
             view: "Columnas",
-            toggle_columns: "Cambiar columnas"
+            toggle_columns: "Cambiar columnas",
+            clear_filters: "Limpiar Filtros"
         },
         roadmap: {
             title: "Hoja de Ruta",
@@ -526,7 +545,15 @@ export const translations = {
             delete_error: "Error al eliminar",
             placeholder: "Escribe el contenido aquí...",
             type_document: "Documento",
-            type_process: "Flujo de Proceso"
+            type_process: "Flujo de Proceso",
+            rename_doc_title: "Renombrar Documento",
+            rename_doc_desc: "Introduce un nuevo título para este documento:",
+            rename_doc_placeholder: "Título del Documento",
+            rename_node_title: "Renombrar Nodo",
+            rename_node_desc: "Introduce una nueva etiqueta para este nodo:",
+            rename_node_placeholder: "Etiqueta del Nodo",
+            renamed_success: "Documento renombrado con éxito",
+            rename_error: "Error al renombrar documento"
         },
         settings: {
             title: "Configuración",

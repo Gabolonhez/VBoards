@@ -4,6 +4,7 @@ import Underline from '@tiptap/extension-underline'
 import TextAlign from '@tiptap/extension-text-align'
 import { Bold, Italic, Underline as UnderlineIcon, Strikethrough, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Heading1, Heading2, Heading3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useEffect } from 'react'
 
 interface RichTextEditorProps {
     content: string
@@ -32,6 +33,12 @@ export function RichTextEditor({ content, onChange, editable = true }: RichTextE
             },
         },
     })
+
+    useEffect(() => {
+        if (editor && content !== editor.getHTML()) {
+            editor.commands.setContent(content)
+        }
+    }, [content, editor])
 
     if (!editor) {
         return null
