@@ -5,8 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { getDocs, createDoc, updateDoc, deleteDoc } from "@/lib/api";
 import { Doc, DocType } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, FileText, Workflow, Save, Trash, Loader2, Circle, Square, Type, Diamond, X, Pencil } from "lucide-react";
+import { FileText, Workflow, Save, Trash, Loader2, Circle, Square, Type, Diamond, X, Pencil } from "lucide-react";
 import ReactFlow, {
     addEdge,
     Background,
@@ -15,8 +14,7 @@ import ReactFlow, {
     Panel,
     useNodesState,
     useEdgesState,
-    Connection,
-    MarkerType
+    Connection
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +24,7 @@ import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { PromptDialog } from "@/components/modals/prompt-dialog";
 import { DiamondNode, TextNode, CircleNode, RectangleNode } from "@/components/flow/custom-nodes";
 import { RichTextEditor } from "@/components/editor/rich-text-editor";
+import { useAuth } from "@/context/auth-context";
 
 const nodeTypes = {
     diamond: DiamondNode,
@@ -37,6 +36,7 @@ const nodeTypes = {
 export default function ProcessesPage() {
     const { toast } = useToast();
     const { t } = useLanguage();
+    const { organization } = useAuth();
     const [docs, setDocs] = useState<Doc[]>([]);
     const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
@@ -50,9 +50,7 @@ export default function ProcessesPage() {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-    useEffect(() => {
-        fetchDocs();
-    }, []);
+
 
     useEffect(() => {
         const doc = docs.find(d => d.id === selectedDocId);
@@ -69,36 +67,44 @@ export default function ProcessesPage() {
                 }
             }
         }
-    }, [selectedDocId, docs]);
+    }, [selectedDocId, docs, setNodes, setEdges]);
 
-    async function fetchDocs() {
+    const fetchDocs = useCallback(async () => {
+        if (!organization) {
+            setLoading(false);
+            return;
+        }
         try {
-            const data = await getDocs();
+            const data = await getDocs(organization.id);
             setDocs(data);
-        } catch (e) {
-            console.error(e);
+        } catch (error) {
+            console.error(error);
         } finally {
             setLoading(false);
         }
-    }
+    }, [organization]);
+
+    useEffect(() => {
+        fetchDocs();
+    }, [organization, fetchDocs]);
 
     async function handleCreate(type: DocType) {
         setCreateDocType(type);
     }
 
     async function confirmCreate(title: string) {
-        if (!createDocType) return;
+        if (!createDocType || !organization) return;
         try {
             const newDoc = await createDoc({
                 title,
                 type: createDocType,
                 content: "",
                 flowDiagramJson: { nodes: [], edges: [] }
-            });
+            }, organization.id);
             setDocs([newDoc, ...docs]);
             setSelectedDocId(newDoc.id);
             toast({ title: t('common.success'), description: t('processes.created') });
-        } catch (e) {
+        } catch {
             toast({ title: t('common.error'), description: t('processes.create_error'), variant: "destructive" });
         } finally {
             setCreateDocType(null);
@@ -122,7 +128,7 @@ export default function ProcessesPage() {
                 setDocs(docs.map(d => d.id === doc.id ? { ...d, flowDiagramJson: flowData } : d));
             }
             toast({ title: t('common.success'), description: t('processes.saved') });
-        } catch (e) {
+        } catch {
             toast({ title: t('common.error'), description: t('processes.save_error'), variant: "destructive" });
         } finally {
             setSaving(false);
@@ -143,7 +149,7 @@ export default function ProcessesPage() {
             await updateDoc(renameDocId, { title: newTitle });
             setDocs(docs.map(d => d.id === renameDocId ? { ...d, title: newTitle } : d));
             toast({ title: t('common.success'), description: t('processes.renamed_success') });
-        } catch (e) {
+        } catch {
             toast({ title: t('common.error'), description: t('processes.rename_error'), variant: "destructive" });
         } finally {
             setRenameDocId(null);
@@ -182,7 +188,7 @@ export default function ProcessesPage() {
         return () => document.removeEventListener('keydown', handleKeyDown);
     }, [onDeleteNode]);
 
-    const onNodeDoubleClick = (_: React.MouseEvent, node: any) => {
+    const onNodeDoubleClick = (_: React.MouseEvent, node: { id: string }) => {
         setEditNodeId(node.id);
     };
 
@@ -206,7 +212,7 @@ export default function ProcessesPage() {
             setDocs(docs.filter(d => d.id !== deleteDocId));
             if (selectedDocId === deleteDocId) setSelectedDocId(null);
             toast({ title: t('common.success'), description: t('processes.deleted') });
-        } catch (e) {
+        } catch {
             toast({ title: t('common.error'), description: t('processes.delete_error'), variant: "destructive" });
         } finally {
             setDeleteDocId(null);

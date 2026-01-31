@@ -65,7 +65,7 @@ export default function SettingsPage() {
 
     return (
         <div className="flex flex-col h-full">
-            <Header title={t('settings.title')} description={t('settings.subtitle')} />
+            <Header title={t('settings.title')} description={t('settings.subtitle')} hideAddButton />
 
             <div className="flex-1 p-6 overflow-auto">
                 <div className="max-w-2xl mx-auto">
@@ -113,9 +113,7 @@ export default function SettingsPage() {
                                 {t('settings.danger_desc')}
                             </p>
                             <div className="flex gap-3">
-                                <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
-                                    {t('settings.delete_data')}
-                                </Button>
+
                                 <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10">
                                     {t('settings.delete_account')}
                                 </Button>
@@ -125,8 +123,8 @@ export default function SettingsPage() {
 
                     {/* App Info */}
                     <div className="mt-6 text-center text-xs text-muted-foreground">
-                        <p>FlowOS v1.0.0</p>
-                        <p className="mt-1">© 2026 FlowOS. {t('settings.rights')}</p>
+                        <p>VBoards v2.0.0</p>
+                        <p className="mt-1">© 2026 VBoards. {t('settings.rights')}</p>
                     </div>
                 </div>
             </div>

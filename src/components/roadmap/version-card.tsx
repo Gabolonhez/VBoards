@@ -42,6 +42,7 @@ export function VersionCard({ version, project, onEdit, onDelete }: VersionCardP
                 "bg-card border rounded-md p-3 shadow-sm space-y-3 cursor-grab hover:border-primary/50 transition-colors relative group",
                 isDragging && "opacity-50 z-50 ring-2 ring-primary rotate-2"
             )}
+            onClick={() => !isDragging && onEdit(version)}
         >
             <div className="flex items-start justify-between">
                 <div>

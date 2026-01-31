@@ -4,23 +4,112 @@
 import { useEffect, useState } from "react";
 import { getDashboardStats } from "@/lib/api";
 import { Task, Version } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { LayoutDashboard, CheckCircle2, Clock, Map } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { formatDistanceToNow } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
+import { createOrganization } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 
 export default function Dashboard() {
   const { t } = useLanguage();
+  const { organization } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<{ tasks: Task[], versions: Version[] } | null>(null);
 
   useEffect(() => {
-    getDashboardStats().then(setStats).catch(console.error).finally(() => setLoading(false));
-  }, []);
+    async function loadStats() {
+      if (!organization) {
+        setLoading(false);
+        return;
+      }
+      try {
+        setLoading(true);
+        const data = await getDashboardStats(organization.id);
+        setStats(data);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadStats();
+  }, [organization]);
+
+  const [newOrgName, setNewOrgName] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
+  const { refreshOrganizations } = useAuth();
+  const { toast } = useToast();
+
+  const handleCreateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrgName) return;
+    setIsCreating(true);
+    try {
+      await createOrganization(newOrgName);
+      await refreshOrganizations();
+      toast({
+        title: t('auth.register_success'),
+        description: t('auth.welcome_back'),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('common.error');
+      toast({
+        title: t('auth.register_error'),
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   if (loading) return <div className="p-8">{t('common.loading')}</div>;
+
+  if (!organization && !loading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-8 text-center space-y-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold">{t('auth.welcome_back')}</h1>
+          <p className="text-muted-foreground max-w-md">
+            Você ainda não possui uma organização. Crie uma agora para começar a gerenciar seus projetos.
+          </p>
+        </div>
+        <Card className="w-full max-w-md bg-stone-900/50 border-stone-800">
+          <form onSubmit={handleCreateOrg}>
+            <CardHeader>
+              <CardTitle>Criar Organização</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 text-left">
+              <div className="space-y-2">
+                <Label htmlFor="orgName">Nome da Organização</Label>
+                <Input
+                  id="orgName"
+                  placeholder="Ex: Minha Empresa"
+                  value={newOrgName}
+                  onChange={(e) => setNewOrgName(e.target.value)}
+                  className="bg-stone-950/50 border-stone-800"
+                  required
+                />
+              </div>
+            </CardContent>
+            <CardFooter>
+              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isCreating}>
+                {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Criar e Começar"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
   if (!stats) return <div className="p-8">{t('common.error')}</div>;
 
   const totalTasks = stats.tasks.length;

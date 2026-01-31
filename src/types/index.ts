@@ -9,6 +9,22 @@ export interface Profile {
   email?: string;
   full_name?: string;
   avatar_url?: string;
+  createdAt?: string;
+}
+
+export interface Organization {
+  id: string;
+  name: string;
+  ownerId: string;
+  createdAt: string;
+}
+
+export interface OrganizationMember {
+  id: string;
+  organizationId: string;
+  userId: string;
+  role: 'owner' | 'admin' | 'member';
+  createdAt: string;
 }
 
 export interface TeamMember {
@@ -18,6 +34,9 @@ export interface TeamMember {
   role?: string;
   avatarUrl?: string; // mapped from avatar_url
   createdAt?: string;
+  userId?: string;
+  email?: string;
+  invitationId?: string;
 }
 
 export interface Project {
@@ -25,12 +44,14 @@ export interface Project {
   name: string;
   prefix: string;
   color: string;
+  organizationId?: string;
   createdAt?: string;
 }
 
 export interface Version {
   id: string;
   projectId: string;
+  organizationId?: string;
   name: string;
   status: VersionStatus;
   releaseDate?: string;
@@ -44,6 +65,7 @@ export interface Task {
   id: string;
   code: string;
   projectId: string;
+  organizationId?: string;
   versionId?: string | null;
   version?: Version;
   title: string;
@@ -61,6 +83,7 @@ export interface Task {
 export interface Doc {
   id: string;
   title: string;
+  organizationId?: string;
   type: DocType;
   content?: string;
   flowDiagramJson?: any;

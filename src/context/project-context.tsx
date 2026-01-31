@@ -4,6 +4,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { Project } from "@/types";
 import { getProjects } from "@/lib/api";
+import { useAuth } from "@/context/auth-context";
 
 interface ProjectContextType {
     projects: Project[];
@@ -16,20 +17,31 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+    const { organization, isLoading: authLoading } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectId, setSelectedProjectIdState] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
         async function loadProjects() {
+            if (authLoading) return;
+            if (!organization) {
+                setProjects([]);
+                setIsLoading(false);
+                return;
+            }
+
             try {
-                const data = await getProjects();
+                setIsLoading(true);
+                const data = await getProjects(organization.id);
                 setProjects(data);
 
                 // Try to restore from local storage
-                const savedIds = localStorage.getItem("flowos_selected_project_id");
+                const savedIds = localStorage.getItem(`flowos_selected_project_id_${organization.id}`);
                 if (savedIds && data.some(p => p.id === savedIds)) {
                     setSelectedProjectIdState(savedIds);
+                } else {
+                    setSelectedProjectIdState(null);
                 }
             } catch (error) {
                 console.error("Failed to load projects", error);
@@ -38,14 +50,14 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
             }
         }
         loadProjects();
-    }, []);
+    }, [organization, authLoading]);
 
     const setSelectedProjectId = (id: string | null) => {
         setSelectedProjectIdState(id);
-        if (id) {
-            localStorage.setItem("flowos_selected_project_id", id);
-        } else {
-            localStorage.removeItem("flowos_selected_project_id");
+        if (id && organization) {
+            localStorage.setItem(`flowos_selected_project_id_${organization.id}`, id);
+        } else if (organization) {
+            localStorage.removeItem(`flowos_selected_project_id_${organization.id}`);
         }
     };
 

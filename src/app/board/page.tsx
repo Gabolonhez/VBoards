@@ -10,8 +10,9 @@ import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask } from
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
-import { Plus, Loader2, Settings2, X, ArrowUpDown } from "lucide-react";
+import { Plus, Loader2, Settings2, X, ArrowUpDown, ChevronsUpDown, Check, ChevronLeft, LayoutDashboard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import {
@@ -47,6 +48,7 @@ export default function BoardPage() {
     const [activeId, setActiveId] = useState<string | null>(null);
     const { t } = useLanguage();
     const { toast } = useToast();
+    const { organization } = useAuth();
 
     const [searchQuery, setSearchQuery] = useState(() => {
         if (typeof window !== 'undefined') return localStorage.getItem("board_filter_search") || "";
@@ -153,11 +155,16 @@ export default function BoardPage() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [organization]);
 
     async function fetchData() {
+        if (!organization) return;
         try {
-            const [t, p, v] = await Promise.all([getTasks(), getProjects(), getVersions()]);
+            const [t, p, v] = await Promise.all([
+                getTasks(organization.id),
+                getProjects(organization.id),
+                getVersions(organization.id)
+            ]);
             setTasks(t);
             setProjects(p);
             setVersions(v);

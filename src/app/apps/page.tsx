@@ -36,8 +36,10 @@ import { useToast } from "@/hooks/use-toast";
 import { Project } from "@/types";
 import { getProjects, createProject, updateProject, deleteProject } from "@/lib/api";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
 
 export default function AppsPage() {
+    const { organization } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -49,9 +51,13 @@ export default function AppsPage() {
     const { t } = useLanguage();
 
     async function fetchData() {
+        if (!organization) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
-            const data = await getProjects();
+            const data = await getProjects(organization.id);
             setProjects(data);
         } catch (error) {
             console.error("Failed to fetch projects", error);
@@ -63,17 +69,18 @@ export default function AppsPage() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [organization]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!organization) return;
         setSubmitting(true);
         try {
             if (editingId) {
                 await updateProject(editingId, formData);
                 toast({ title: t('common.success'), description: "App updated successfully" });
             } else {
-                await createProject(formData);
+                await createProject(formData, organization.id);
                 toast({ title: t('common.success'), description: "App created successfully" });
             }
             setIsDialogOpen(false);
@@ -148,7 +155,7 @@ export default function AppsPage() {
                             {projects.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                        No apps found. Create one to get started.
+                                        {t('apps.no_apps')}
                                     </TableCell>
                                 </TableRow>
                             ) : (

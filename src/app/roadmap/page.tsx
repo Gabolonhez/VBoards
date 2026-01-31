@@ -25,9 +25,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useProject } from "@/context/project-context";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export default function RoadmapPage() {
+    const { organization } = useAuth();
     const [versions, setVersions] = useState<Version[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [members, setMembers] = useState<TeamMember[]>([]);
@@ -65,11 +67,19 @@ export default function RoadmapPage() {
     useEffect(() => {
         fetchData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [organization]);
 
     async function fetchData() {
+        if (!organization) {
+            setLoading(false);
+            return;
+        }
         try {
-            const [vData, pData, mData] = await Promise.all([getVersions(), getProjects(), getMembers()]);
+            const [vData, pData, mData] = await Promise.all([
+                getVersions(organization.id),
+                getProjects(organization.id),
+                getMembers(organization.id)
+            ]);
             setVersions(vData);
             setProjects(pData);
             setMembers(mData);
@@ -83,7 +93,7 @@ export default function RoadmapPage() {
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!formData.projectId || !formData.name) return;
+        if (!formData.projectId || !formData.name || !organization) return;
 
         setSubmitting(true);
         try {
@@ -96,7 +106,7 @@ export default function RoadmapPage() {
                 await updateVersion(editingVersionId, data);
                 toast({ title: t('common.success'), description: t('roadmap.version_updated') });
             } else {
-                await createVersion(data);
+                await createVersion(data, organization.id);
                 toast({ title: t('common.success'), description: t('roadmap.version_created') });
             }
             setIsDialogOpen(false);
@@ -225,6 +235,14 @@ export default function RoadmapPage() {
                                     <Input id="name" placeholder="v1.0.0" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                                 </div>
                                 <div className="space-y-2">
+                                    <Label htmlFor="description">{t('roadmap.description_optional')}</Label>
+                                    <Input
+                                        id="description"
+                                        value={formData.notes}
+                                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
                                     <Label htmlFor="status">{t('common.status')}</Label>
                                     <Select
                                         value={formData.status}
@@ -242,7 +260,7 @@ export default function RoadmapPage() {
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Owner</Label>
+                                    <Label>{t('common.owner')}</Label>
                                     <Select value={formData.ownerId} onValueChange={v => setFormData({ ...formData, ownerId: v })}>
                                         <SelectTrigger><SelectValue placeholder={t('common.unassigned')} /></SelectTrigger>
                                         <SelectContent>
@@ -304,7 +322,7 @@ export default function RoadmapPage() {
                                 <TableRow>
                                     <TableHead>{t('roadmap.version_name')}</TableHead>
                                     <TableHead>{t('common.project')}</TableHead>
-                                    <TableHead>Owner</TableHead>
+                                    <TableHead>{t('common.owner')}</TableHead>
                                     <TableHead>{t('common.status')}</TableHead>
                                     <TableHead>{t('roadmap.release_date')}</TableHead>
                                     <TableHead className="text-right">{t('common.actions')}</TableHead>

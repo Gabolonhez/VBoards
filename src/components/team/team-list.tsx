@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TeamMember } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,18 +12,28 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trash, Search, Shield, Plus } from "lucide-react";
+import { Trash, Search, Shield, Plus, Copy, Check, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
 import { useLanguage } from "@/context/language-context";
-import { createMember, deleteMember } from "@/lib/api";
+import { deleteMember, inviteMember, updateMember } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/auth-context";
 
 interface TeamListProps {
     initialMembers: TeamMember[];
+    onRefresh?: () => void;
 }
 
-export function TeamList({ initialMembers }: TeamListProps) {
+export function TeamList({ initialMembers, onRefresh }: TeamListProps) {
+    const { organization } = useAuth();
     const [members, setMembers] = useState<TeamMember[]>(initialMembers);
     const [search, setSearch] = useState("");
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -31,11 +41,31 @@ export function TeamList({ initialMembers }: TeamListProps) {
     const { t } = useLanguage();
     const { toast } = useToast();
     const [loading, setLoading] = useState(false);
+    const [copiedToken, setCopiedToken] = useState<string | null>(null);
+
+    const copyInviteLink = (email: string, id: string) => {
+        // Invite link points to register page with prefilled email
+        const link = `${window.location.origin}/register?email=${encodeURIComponent(email)}`;
+        navigator.clipboard.writeText(link);
+        setCopiedToken(id);
+        toast({ title: t('common.success'), description: "Link copied to clipboard!" });
+        setTimeout(() => setCopiedToken(null), 2000);
+    };
+
+    // Update members when initialMembers changes (e.g. on organization switch)
+    useEffect(() => {
+        setMembers(initialMembers);
+    }, [initialMembers]);
 
     // Form state
-    const [newName, setNewName] = useState("");
-    const [newNickname, setNewNickname] = useState("");
-    const [newRole, setNewRole] = useState("");
+    const [newEmail, setNewEmail] = useState("");
+    const [newRole, setNewRole] = useState("member");
+
+    // Edit state
+    const [isEditOpen, setIsEditOpen] = useState(false);
+    const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+    const [editNickname, setEditNickname] = useState("");
+    const [editRole, setEditRole] = useState("member");
 
     const filteredMembers = members.filter(m =>
         m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -44,22 +74,17 @@ export function TeamList({ initialMembers }: TeamListProps) {
     );
 
     async function handleAdd() {
-        if (!newName) return;
+        if (!newEmail || !organization) return;
         setLoading(true);
         try {
-            const newMember = await createMember({
-                name: newName,
-                nickname: newNickname,
-                role: newRole
-            });
-            setMembers([newMember, ...members]);
+            await inviteMember(newEmail, newRole, organization.id);
             setIsAddOpen(false);
-            setNewName("");
-            setNewNickname("");
-            setNewRole("");
-            toast({ title: t('common.success'), description: t('team.member_added') });
+            setNewEmail("");
+            setNewRole("member");
+            toast({ title: t('common.success'), description: t('team.invite_sent') });
+            onRefresh?.();
         } catch {
-            toast({ title: t('common.error'), description: t('team.add_error'), variant: "destructive" });
+            toast({ title: t('common.error'), description: t('team.invite_error'), variant: "destructive" });
         } finally {
             setLoading(false);
         }
@@ -75,6 +100,39 @@ export function TeamList({ initialMembers }: TeamListProps) {
             toast({ title: t('common.error'), description: t('team.remove_error'), variant: "destructive" });
         } finally {
             setDeleteId(null);
+        }
+    }
+
+    function openEdit(member: TeamMember) {
+        setEditingMember(member);
+        setEditNickname(member.nickname || "");
+        setEditRole(member.role || "member");
+        setIsEditOpen(true);
+    }
+
+    async function handleUpdate() {
+        if (!editingMember) return;
+        setLoading(true);
+        try {
+            await updateMember(editingMember.id, {
+                nickname: editNickname,
+                role: editRole
+            });
+
+            // Update local state
+            setMembers(members.map(m =>
+                m.id === editingMember.id
+                    ? { ...m, nickname: editNickname, role: editRole }
+                    : m
+            ));
+
+            setIsEditOpen(false);
+            setEditingMember(null);
+            toast({ title: t('common.success'), description: t('team.member_updated') });
+        } catch {
+            toast({ title: t('common.error'), description: t('team.update_error'), variant: "destructive" });
+        } finally {
+            setLoading(false);
         }
     }
 
@@ -101,7 +159,7 @@ export function TeamList({ initialMembers }: TeamListProps) {
                         />
                     </div>
                     <Button onClick={() => setIsAddOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" /> {t('team.add_member')}
+                        <Plus className="h-4 w-4 mr-2" /> {t('team.invite_member')}
                     </Button>
                 </div>
 
@@ -123,18 +181,50 @@ export function TeamList({ initialMembers }: TeamListProps) {
                                             <AvatarImage src={member.avatarUrl} />
                                             <AvatarFallback>{getInitials(member.name)}</AvatarFallback>
                                         </Avatar>
-                                        <span className="font-medium">{member.name}</span>
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">{member.name}</span>
+                                            {member.email && <span className="text-xs text-muted-foreground">{member.email}</span>}
+                                        </div>
                                     </TableCell>
-                                    <TableCell>{member.nickname || "-"}</TableCell>
+                                    <TableCell>
+                                        {member.invitationId && !member.userId ? (
+                                            <span className="inline-flex items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-0.5 text-xs font-semibold text-yellow-500">
+                                                {t('team.pending')}
+                                            </span>
+                                        ) : (
+                                            member.nickname || "-"
+                                        )}
+                                    </TableCell>
                                     <TableCell>
                                         {member.role && (
                                             <div className="flex items-center gap-1 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full w-fit">
                                                 <Shield className="h-3 w-3" />
-                                                {member.role}
+                                                {member.role === 'admin' ? t('team.roles.admin') : t('team.roles.member')}
                                             </div>
                                         )}
                                     </TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="text-right flex justify-end gap-2">
+                                        {member.invitationId && !member.userId && (
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-muted-foreground hover:text-primary"
+                                                onClick={() => copyInviteLink(member.email!, member.id)}
+                                                title={t('team.copy_invite_link') || "Copy Invite Link"}
+                                            >
+                                                {copiedToken === member.id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                            </Button>
+                                        )}
+
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-muted-foreground hover:text-primary"
+                                            onClick={() => openEdit(member)}
+                                            title={t('team.edit_member')}
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                        </Button>
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -162,27 +252,75 @@ export function TeamList({ initialMembers }: TeamListProps) {
                     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                         <div className="bg-background border rounded-lg shadow-lg w-full max-w-md p-6 space-y-4">
                             <div className="space-y-2">
-                                <h2 className="text-lg font-semibold">{t('team.add_dialog_title')}</h2>
-                                <p className="text-sm text-muted-foreground">{t('team.add_dialog_desc')}</p>
+                                <h2 className="text-lg font-semibold">{t('team.invite_dialog_title')}</h2>
+                                <p className="text-sm text-muted-foreground">{t('team.invite_dialog_desc')}</p>
                             </div>
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('team.full_name')}</label>
-                                    <Input placeholder="John Doe" value={newName} onChange={(e) => setNewName(e.target.value)} />
+                                    <label className="text-sm font-medium">{t('auth.email')}</label>
+                                    <Input placeholder={t('team.email_placeholder')} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('team.nickname_optional')}</label>
-                                    <Input placeholder="Johnny" value={newNickname} onChange={(e) => setNewNickname(e.target.value)} />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">{t('team.role_optional')}</label>
-                                    <Input placeholder="Developer" value={newRole} onChange={(e) => setNewRole(e.target.value)} />
+                                    <label className="text-sm font-medium">{t('team.role')}</label>
+                                    <Select value={newRole} onValueChange={setNewRole}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={t('team.role')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="member">{t('team.roles.member')}</SelectItem>
+                                            <SelectItem value="admin">{t('team.roles.admin')}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" onClick={() => setIsAddOpen(false)}>{t('common.cancel')}</Button>
-                                <Button onClick={handleAdd} disabled={!newName || loading}>
-                                    {loading ? t('team.adding') : t('team.add_member')}
+                                <Button onClick={handleAdd} disabled={!newEmail || loading}>
+                                    {loading ? t('common.loading') : t('team.invite_member')}
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Edit Member Dialog */}
+                {isEditOpen && editingMember && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div className="bg-background border rounded-lg shadow-lg w-full max-w-md p-6 space-y-4">
+                            <div className="space-y-2">
+                                <h2 className="text-lg font-semibold">{t('team.edit_dialog_title')}</h2>
+                                <p className="text-sm text-muted-foreground">{t('team.edit_dialog_desc')}</p>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('team.member')}</label>
+                                    <Input value={editingMember.name} disabled className="bg-muted" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('team.nickname')}</label>
+                                    <Input
+                                        placeholder={t('team.nickname_optional')}
+                                        value={editNickname}
+                                        onChange={(e) => setEditNickname(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">{t('team.role')}</label>
+                                    <Select value={editRole} onValueChange={setEditRole}>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder={t('team.role')} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="member">{t('team.roles.member')}</SelectItem>
+                                            <SelectItem value="admin">{t('team.roles.admin')}</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                <Button variant="ghost" onClick={() => setIsEditOpen(false)}>{t('common.cancel')}</Button>
+                                <Button onClick={handleUpdate} disabled={loading}>
+                                    {loading ? t('common.loading') : t('common.save')}
                                 </Button>
                             </div>
                         </div>

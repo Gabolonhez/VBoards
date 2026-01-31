@@ -8,9 +8,10 @@ import { useLanguage } from "@/context/language-context";
 interface HeaderProps {
     title: string;
     description?: string;
+    hideAddButton?: boolean;
 }
 
-export function Header({ title, description }: HeaderProps) {
+export function Header({ title, description, hideAddButton }: HeaderProps) {
     const { t } = useLanguage();
 
     return (
@@ -23,10 +24,12 @@ export function Header({ title, description }: HeaderProps) {
             </div>
 
             <div className="flex items-center gap-3">
-                <Button className="gap-2 bg-primary hover:bg-primary/90">
-                    <Plus className="h-4 w-4" />
-                    <span>{t('common.new_task')}</span>
-                </Button>
+                {!hideAddButton && (
+                    <Button className="gap-2 bg-primary hover:bg-primary/90">
+                        <Plus className="h-4 w-4" />
+                        <span>{t('common.new_task')}</span>
+                    </Button>
+                )}
 
                 <Button variant="ghost" size="icon" className="relative">
                     <Bell className="h-5 w-5 text-muted-foreground" />

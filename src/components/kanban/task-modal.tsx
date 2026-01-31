@@ -16,6 +16,7 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/context/language-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/context/auth-context";
 
 interface TaskModalProps {
     open: boolean;
@@ -27,6 +28,7 @@ interface TaskModalProps {
 export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProps) {
     const { toast } = useToast();
     const { t } = useLanguage();
+    const { organization } = useAuth();
     const [submitting, setSubmitting] = useState(false);
     const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
@@ -46,8 +48,12 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
     });
 
     useEffect(() => {
-        if (open) {
-            Promise.all([getProjects(), getVersions(), getMembers()]).then(([p, v, m]) => {
+        if (open && organization) {
+            Promise.all([
+                getProjects(organization.id),
+                getVersions(organization.id),
+                getMembers(organization.id)
+            ]).then(([p, v, m]) => {
                 setProjects(p);
                 setVersions(v);
                 setMembers(m);
@@ -83,7 +89,7 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
             });
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, task]);
+    }, [open, task, organization]);
 
     const toggleProject = (projectId: string) => {
         // If editing existing task, do not allow multi-select or changing project easily (complex)
@@ -129,7 +135,7 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
             } else {
                 // Create multiple tasks
                 await Promise.all(selectedProjectIds.map(pid =>
-                    createTask({ ...taskData, projectId: pid })
+                    createTask({ ...taskData, projectId: pid }, organization!.id)
                 ));
             }
             toast({ title: t('common.success'), description: "Task saved" });
