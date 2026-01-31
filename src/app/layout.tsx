@@ -10,7 +10,7 @@ import { LanguageProvider } from "@/context/language-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "VBoard",
+  title: "VBoards",
   description: "Kanban and version control for your team & apps",
   icons: {
     icon: "/logo.png?v=2",

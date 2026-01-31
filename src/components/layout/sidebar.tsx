@@ -66,9 +66,9 @@ export function Sidebar() {
                 {/* Branding Section */}
                 <div className="flex items-center gap-3 h-14 px-4">
                     <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0 overflow-hidden relative">
-                        <Image src="/logo.png" alt="VBoard" fill className="object-cover" />
+                        <Image src="/logo.png" alt="VBoards" fill className="object-cover" />
                     </div>
-                    {!collapsed && <span className="font-bold text-xl tracking-tight text-sidebar-foreground">VBoard</span>}
+                    {!collapsed && <span className="font-bold text-xl tracking-tight text-sidebar-foreground">VBoards</span>}
                     {!collapsed && (
                         <Button
                             variant="ghost"
