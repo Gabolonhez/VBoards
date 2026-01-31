@@ -41,6 +41,9 @@ export const translations = {
             select_language: "Select Language",
             title: "Title",
             description: "Description",
+            type: "Type",
+            us: "User Story",
+            bug: "Bug",
             none: "None",
             unassigned: "Unassigned",
             unknown: "Unknown",
@@ -86,6 +89,7 @@ export const translations = {
             subtitle: "Manage project versions and releases",
             version_name: "Version Name",
             release_date: "Release Date",
+            release_date_optional: "Release Date (Optional)",
             planned: "Planned",
             in_development: "In Development",
             in_stores: "In Stores",
@@ -103,7 +107,8 @@ export const translations = {
             version_updated: "Version updated successfully",
             update_error: "Failed to update version",
             view_list: "List",
-            view_board: "Board"
+            view_board: "Board",
+            tbd: "TBD"
         },
         apps: {
             title: "Apps & Projects",
@@ -243,6 +248,9 @@ export const translations = {
             select_language: "Selecionar Idioma",
             title: "Título",
             description: "Descrição",
+            type: "Tipo",
+            us: "História",
+            bug: "Bug",
             none: "Nenhum",
             unassigned: "Não atribuído",
             unknown: "Desconhecido",
@@ -288,6 +296,7 @@ export const translations = {
             subtitle: "Gerencie versões e lançamentos do projeto",
             version_name: "Nome da Versão",
             release_date: "Data de Lançamento",
+            release_date_optional: "Data de Lançamento (Opcional)",
             planned: "Previsto",
             in_development: "Em Desenvolvimento",
             in_stores: "Nas Lojas",
@@ -305,7 +314,8 @@ export const translations = {
             version_updated: "Versão atualizada com sucesso",
             update_error: "Falha ao atualizar versão",
             view_list: "Lista",
-            view_board: "Quadro"
+            view_board: "Quadro",
+            tbd: "A definir"
         },
         apps: {
             title: "Apps e Projetos",
@@ -446,6 +456,9 @@ export const translations = {
             select_language: "Seleccionar Idioma",
             title: "Título",
             description: "Descripción",
+            type: "Tipo",
+            us: "Historia",
+            bug: "Bug",
             none: "Ninguno",
             unassigned: "Sin Asignar",
             unknown: "Desconocido",
@@ -491,6 +504,7 @@ export const translations = {
             subtitle: "Gestionar versiones y lanzamientos del proyecto",
             version_name: "Nombre de la Versión",
             release_date: "Fecha de Lanzamiento",
+            release_date_optional: "Fecha de Lanzamiento (Opcional)",
             planned: "Planificado",
             in_development: "En Desarrollo",
             in_stores: "En Tiendas",
@@ -508,7 +522,8 @@ export const translations = {
             version_updated: "Versión actualizada con éxito",
             update_error: "Error al actualizar versión",
             view_list: "Lista",
-            view_board: "Tablero"
+            view_board: "Tablero",
+            tbd: "Por definir"
         },
         apps: {
             title: "Apps y Proyectos",

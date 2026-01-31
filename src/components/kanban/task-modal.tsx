@@ -41,7 +41,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
         projectId: "",
         versionId: "",
         assigneeId: "none",
-        imageUrls: ""
+        imageUrls: "",
+        type: null as 'us' | 'bug' | null
     });
 
     useEffect(() => {
@@ -61,7 +62,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                         projectId: task.projectId,
                         versionId: task.versionId || "",
                         assigneeId: task.assigneeId || "none",
-                        imageUrls: task.images?.join('\n') || ""
+                        imageUrls: task.images?.join('\n') || "",
+                        type: task.type || null
                     });
                 } else {
                     const defaultProject = p.length > 0 ? [p[0].id] : [];
@@ -74,7 +76,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                         projectId: defaultProject[0] || "",
                         versionId: "",
                         assigneeId: "none",
-                        imageUrls: ""
+                        imageUrls: "",
+                        type: null
                     });
                 }
             });
@@ -147,6 +150,22 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                     <DialogTitle>{task ? t('board.edit_task') : t('board.create_task')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
+                    <div className="space-y-2">
+                        <Label>{t('common.type')}</Label>
+                        <Select
+                            value={formData.type || "none"}
+                            onValueChange={(v: string) => setFormData({ ...formData, type: v === "none" ? null : v as 'us' | 'bug' })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder={t('common.none')} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">{t('common.none')}</SelectItem>
+                                <SelectItem value="us">{t('common.us')}</SelectItem>
+                                <SelectItem value="bug">{t('common.bug')}</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="space-y-2">
                         <Label>{t('common.title')}</Label>
                         <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} required />

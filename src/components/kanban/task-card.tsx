@@ -49,16 +49,16 @@ export function TaskCard({ task, project, onClick, onDelete, selected, onToggleS
                     <img src={task.images[0]} alt="Task cover" className="w-full h-32 object-cover" />
                 </div>
             )}
-            
+
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                     {onToggleSelect && (
-                         <Checkbox 
+                        <Checkbox
                             checked={selected}
                             onCheckedChange={() => onToggleSelect(task.id)}
                             onClick={(e) => e.stopPropagation()}
                             className={cn("h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity", selected && "opacity-100")}
-                         />
+                        />
                     )}
                     <span className="text-xs font-mono text-muted-foreground">{task.code}</span>
                 </div>
@@ -79,9 +79,19 @@ export function TaskCard({ task, project, onClick, onDelete, selected, onToggleS
             <p className="text-sm font-medium line-clamp-2 pr-4">{task.title}</p>
 
             <div className="flex items-center justify-between mt-2">
-                <Badge variant={task.priority === 'critical' ? 'destructive' : 'secondary'} className="text-[10px] h-5 px-1 capitalize">
-                    {t(`board.${task.priority}` as any)}
-                </Badge>
+                <div className="flex gap-2 items-center">
+                    <Badge variant={task.priority === 'critical' ? 'destructive' : 'secondary'} className="text-[10px] h-5 px-1 capitalize">
+                        {t(`board.${task.priority}` as any)}
+                    </Badge>
+                    {task.type && (
+                        <Badge variant="outline" className={cn(
+                            "text-[10px] h-5 px-1 uppercase font-bold",
+                            task.type === 'bug' ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                        )}>
+                            {t(`common.${task.type}`)}
+                        </Badge>
+                    )}
+                </div>
 
                 {task.assignee && (
                     <Avatar className="h-6 w-6">

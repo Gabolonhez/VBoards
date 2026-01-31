@@ -262,7 +262,7 @@ export default function RoadmapPage() {
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="date">{t('roadmap.release_date')}</Label>
+                                    <Label htmlFor="date">{t('roadmap.release_date_optional')}</Label>
                                     <Input id="date" type="date" value={formData.releaseDate} onChange={e => setFormData({ ...formData, releaseDate: e.target.value })} />
                                 </div>
                                 <DialogFooter>

@@ -55,6 +55,7 @@ export interface Task {
   createdAt?: string;
   updatedAt?: string;
   images?: string[];
+  type?: 'us' | 'bug' | null;
 }
 
 export interface Doc {

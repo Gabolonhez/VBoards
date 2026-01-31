@@ -54,7 +54,7 @@ export async function createVersion(version: Omit<Version, "id">): Promise<Versi
         project_id: version.projectId,
         name: version.name,
         status: version.status,
-        release_date: version.releaseDate,
+        release_date: version.releaseDate || null,
         notes: version.notes,
         owner_id: version.ownerId
     }).select().single();
@@ -65,9 +65,9 @@ export async function createVersion(version: Omit<Version, "id">): Promise<Versi
 
 export async function updateVersion(id: string, updates: Partial<Version>): Promise<void> {
     const dbUpdates: any = { ...updates };
-    if (updates.projectId) dbUpdates.project_id = updates.projectId;
-    if (updates.releaseDate) dbUpdates.release_date = updates.releaseDate;
-    if (updates.ownerId) dbUpdates.owner_id = updates.ownerId;
+    if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId;
+    if (updates.releaseDate !== undefined) dbUpdates.release_date = updates.releaseDate || null;
+    if (updates.ownerId !== undefined) dbUpdates.owner_id = updates.ownerId;
     delete dbUpdates.projectId;
     delete dbUpdates.releaseDate;
     delete dbUpdates.ownerId;
@@ -141,6 +141,7 @@ export async function createTask(task: Partial<Task>): Promise<Task> {
         status: task.status,
         images: task.images,
         priority: task.priority,
+        type: task.type,
         code: task.code || `TASK-${Math.floor(Math.random() * 10000)}`,
         assignee_id: task.assigneeId === undefined ? undefined : task.assigneeId
     }).select().single();
