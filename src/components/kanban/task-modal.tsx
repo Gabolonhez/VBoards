@@ -23,9 +23,10 @@ interface TaskModalProps {
     onOpenChange: (open: boolean) => void;
     task?: Task | null;
     onSuccess: () => void;
+    selectedTaskIds?: string[];
 }
 
-export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProps) {
+export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds }: TaskModalProps) {
     const { toast } = useToast();
     const { t } = useLanguage();
     const { organization } = useAuth();
@@ -88,7 +89,6 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
                 }
             });
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open, task, organization]);
 
     const toggleProject = (projectId: string) => {
@@ -130,8 +130,32 @@ export function TaskModal({ open, onOpenChange, task, onSuccess }: TaskModalProp
             const { imageUrls, ...taskData } = dataTemplate;
 
             if (task) {
-                // Update single task
-                await updateTask(task.id, { ...taskData, projectId: selectedProjectIds[0] });
+                // Check if we should perform bulk update
+                const isBulkUpdate = selectedTaskIds && selectedTaskIds.length > 1 && selectedTaskIds.includes(task.id);
+
+                if (isBulkUpdate) {
+                    // Update metadata for all selected tasks
+                    const bulkData = {
+                        projectId: selectedProjectIds[0],
+                        versionId: taskData.versionId,
+                        status: taskData.status,
+                        priority: taskData.priority,
+                        assigneeId: taskData.assigneeId,
+                        type: taskData.type
+                    };
+
+                    await Promise.all(selectedTaskIds.map(id => {
+                        // For the current task, we send all data (including title/desc)
+                        if (id === task.id) {
+                            return updateTask(id, { ...taskData, projectId: selectedProjectIds[0] });
+                        }
+                        // For others, only the metadata
+                        return updateTask(id, bulkData);
+                    }));
+                } else {
+                    // Update single task
+                    await updateTask(task.id, { ...taskData, projectId: selectedProjectIds[0] });
+                }
             } else {
                 // Create multiple tasks
                 await Promise.all(selectedProjectIds.map(pid =>

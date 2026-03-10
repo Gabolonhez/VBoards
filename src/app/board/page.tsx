@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/kanban/column";
 import { TaskModal } from "@/components/kanban/task-modal";
 import { Task, Project, Version, TaskStatus } from "@/types";
@@ -10,7 +10,7 @@ import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask } from
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
-import { Plus, Loader2, Settings2, X, ArrowUpDown, ChevronsUpDown, Check, ChevronLeft, LayoutDashboard } from "lucide-react";
+import { Plus, Loader2, Settings2, X, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/context/auth-context";
 import { ConfirmDialog } from "@/components/modals/confirm-dialog";
@@ -45,7 +45,6 @@ export default function BoardPage() {
     const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
 
     const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
-    const [activeId, setActiveId] = useState<string | null>(null);
     const { t } = useLanguage();
     const { toast } = useToast();
     const { organization } = useAuth();
@@ -155,6 +154,7 @@ export default function BoardPage() {
 
     useEffect(() => {
         fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [organization]);
 
     async function fetchData() {
@@ -219,13 +219,12 @@ export default function BoardPage() {
         }
     }
 
-    function handleDragStart(event: DragStartEvent) {
-        setActiveId(event.active.id as string);
+    function handleDragStart() {
+        // No activeId needed if not using DragOverlay in this page
     }
 
     async function handleDragEnd(event: DragEndEvent) {
         const { active, over } = event;
-        setActiveId(null);
 
         if (!over) return;
 
@@ -271,6 +270,11 @@ export default function BoardPage() {
     function handleNewTask() {
         setSelectedTask(null);
         setIsModalOpen(true);
+    }
+
+    function handleModalSuccess() {
+        fetchData();
+        setSelectedTaskIds([]);
     }
 
     const { selectedProjectId } = useProject();
@@ -331,8 +335,7 @@ export default function BoardPage() {
                                     <DropdownMenuCheckboxItem
                                         key={col.id}
                                         checked={visibleColumns.includes(col.id)}
-                                        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                                        onCheckedChange={(_checked) => toggleColumn(col.id)}
+                                        onCheckedChange={() => toggleColumn(col.id)}
                                     >
                                         {col.title}
                                     </DropdownMenuCheckboxItem>
@@ -456,7 +459,8 @@ export default function BoardPage() {
                 open={isModalOpen}
                 onOpenChange={setIsModalOpen}
                 task={selectedTask}
-                onSuccess={fetchData}
+                onSuccess={handleModalSuccess}
+                selectedTaskIds={selectedTaskIds}
             />
 
             <ConfirmDialog
