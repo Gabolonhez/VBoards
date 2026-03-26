@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/context/language-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/context/auth-context";
+import { useCallback } from "react";
 
 interface TaskModalProps {
     open: boolean;
@@ -36,6 +37,8 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
     const [versions, setVersions] = useState<Version[]>([]);
     const [members, setMembers] = useState<TeamMember[]>([]);
 
+    const getStorageKey = useCallback(() => task ? `task-edit-${task.id}` : "task-new-data", [task]);
+
     const [formData, setFormData] = useState({
         title: "",
         description: "",
@@ -48,8 +51,30 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
         type: null as 'us' | 'bug' | null
     });
 
+    // Helper to load state
+    const loadState = useCallback(() => {
+        const key = getStorageKey();
+        const saved = localStorage.getItem(key);
+
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                setFormData(parsed);
+                // Also restore project selection if saved
+                if (parsed.projectId) {
+                    setSelectedProjectIds([parsed.projectId]);
+                }
+                return true;
+            } catch (e) {
+                console.error("Error parsing saved form data", e);
+            }
+        }
+        return false;
+    }, [getStorageKey]);
+
     useEffect(() => {
         if (open && organization) {
+            setSubmitting(false); // Reset submitting on open
             Promise.all([
                 getProjects(organization.id),
                 getVersions(organization.id),
@@ -58,6 +83,10 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                 setProjects(p);
                 setVersions(v);
                 setMembers(m);
+
+                // Try to load from localStorage first
+                const loaded = loadState();
+                if (loaded) return;
 
                 if (task) {
                     setSelectedProjectIds([task.projectId]);
@@ -89,7 +118,14 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                 }
             });
         }
-    }, [open, task, organization]);
+    }, [open, task, organization, loadState]);
+
+    // Save formData to localStorage while modal is open
+    useEffect(() => {
+        if (open) {
+            localStorage.setItem(getStorageKey(), JSON.stringify(formData));
+        }
+    }, [formData, open, getStorageKey]);
 
     const toggleProject = (projectId: string) => {
         // If editing existing task, do not allow multi-select or changing project easily (complex)
@@ -163,6 +199,7 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                 ));
             }
             toast({ title: t('common.success'), description: "Task saved" });
+            localStorage.removeItem(getStorageKey());
             onSuccess();
             onOpenChange(false);
         } catch (error) {

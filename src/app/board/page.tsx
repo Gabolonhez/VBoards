@@ -6,7 +6,7 @@ import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "
 import { KanbanColumn } from "@/components/kanban/column";
 import { TaskModal } from "@/components/kanban/task-modal";
 import { Task, Project, Version, TaskStatus } from "@/types";
-import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask } from "@/lib/api";
+import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask, updateTask } from "@/lib/api";
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -30,6 +30,9 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 
 
@@ -198,10 +201,31 @@ export default function BoardPage() {
         try {
             await Promise.all(idsToUpdate.map(id => updateTaskStatus(id, status)));
             toast({ title: t('common.success'), description: "Tasks updated" });
+            fetchData();
         } catch (e) {
             console.error(e);
             fetchData();
-            toast({ title: "Error", description: "Failed to update tasks", variant: "destructive" });
+            toast({ title: t('common.error'), description: "Failed to update tasks", variant: "destructive" });
+        }
+    }
+
+    async function handleBulkVersionChange(versionId: string | null) {
+        // Optimistic update
+        setTasks(prev => prev.map(t =>
+            selectedTaskIds.includes(t.id) ? { ...t, versionId: versionId || undefined } : t
+        ));
+
+        const idsToUpdate = [...selectedTaskIds];
+        setSelectedTaskIds([]);
+
+        try {
+            await Promise.all(idsToUpdate.map(id => updateTask(id, { versionId })));
+            toast({ title: t('common.success'), description: "Tasks updated" });
+            fetchData(); // important to refresh because version relationship affects columns/filtering
+        } catch (e) {
+            console.error(e);
+            fetchData();
+            toast({ title: t('common.error'), description: "Failed to update tasks", variant: "destructive" });
         }
     }
 
@@ -435,18 +459,36 @@ export default function BoardPage() {
 
             {selectedTaskIds.length > 0 && (
                 <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-popover border shadow-lg rounded-full px-6 py-2 flex items-center gap-4 animate-in slide-in-from-bottom-5 z-20">
-                    <span className="text-sm font-medium">{selectedTaskIds.length} selected</span>
+                    <span className="text-sm font-medium">{selectedTaskIds.length} {t('common.selected')}</span>
                     <div className="h-4 w-px bg-border" />
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">Move to...</Button>
+                            <Button variant="ghost" size="sm">{t('board.move_to')}</Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent>
-                            {COLUMNS.map(col => (
-                                <DropdownMenuItem key={col.id} onClick={() => handleBulkStatusChange(col.id)}>
-                                    {col.title}
-                                </DropdownMenuItem>
-                            ))}
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>{t('common.status')}</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    {COLUMNS.map(col => (
+                                        <DropdownMenuItem key={col.id} onClick={() => handleBulkStatusChange(col.id)}>
+                                            {col.title}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>{t('common.version')}</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuItem onClick={() => handleBulkVersionChange(null)}>
+                                        {t('common.none')}
+                                    </DropdownMenuItem>
+                                    {filteredVersions.map(v => (
+                                        <DropdownMenuItem key={v.id} onClick={() => handleBulkVersionChange(v.id)}>
+                                            {v.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
                         </DropdownMenuContent>
                     </DropdownMenu>
                     <Button variant="ghost" size="icon" className="h-8 w-8 ml-2" onClick={() => setSelectedTaskIds([])}>

@@ -49,9 +49,9 @@ export const translations = {
             unknown: "Unknown",
             are_you_sure: "Are you sure?",
             confirm: "Confirm",
-            delete_title: "Delete item?",
             delete_desc: "This action cannot be undone. Are you sure you want to proceed?",
-            owner: "Owner"
+            owner: "Owner",
+            selected: "selected"
         },
         dashboard: {
             quick_stats: "Quick Stats",
@@ -83,7 +83,8 @@ export const translations = {
             critical: "Critical",
             view: "Columns",
             toggle_columns: "Toggle Columns",
-            clear_filters: "Clear Filters"
+            clear_filters: "Clear Filters",
+            move_to: "Move to..."
         },
         roadmap: {
             title: "Versions",
@@ -303,7 +304,8 @@ export const translations = {
             confirm: "Confirmar",
             delete_title: "Excluir item?",
             delete_desc: "Esta ação não pode ser desfeita. Tem certeza de que deseja prosseguir?",
-            owner: "Dono"
+            owner: "Dono",
+            selected: "selecionados"
         },
         dashboard: {
             quick_stats: "Estatísticas Rápidas",
@@ -335,7 +337,8 @@ export const translations = {
             critical: "Crítica",
             view: "Colunas",
             toggle_columns: "Alterar Colunas",
-            clear_filters: "Limpar Filtros"
+            clear_filters: "Limpar Filtros",
+            move_to: "Mover para..."
         },
         roadmap: {
             title: "Versões",
@@ -556,7 +559,8 @@ export const translations = {
             confirm: "Confirmar",
             delete_title: "¿Eliminar elemento?",
             delete_desc: "Esta acción no se puede deshacer. ¿Estás seguro de que quieres continuar?",
-            owner: "Propietario"
+            owner: "Propietario",
+            selected: "seleccionados"
         },
         dashboard: {
             quick_stats: "Estadísticas Rápidas",
@@ -588,7 +592,8 @@ export const translations = {
             critical: "Crítica",
             view: "Columnas",
             toggle_columns: "Cambiar columnas",
-            clear_filters: "Limpiar Filtros"
+            clear_filters: "Limpiar Filtros",
+            move_to: "Mover a..."
         },
         roadmap: {
             title: "Hoja de Ruta",
