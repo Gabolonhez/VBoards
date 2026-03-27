@@ -36,6 +36,7 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
     const [versions, setVersions] = useState<Version[]>([]);
     const [members, setMembers] = useState<TeamMember[]>([]);
+    const [isInitialized, setIsInitialized] = useState(false);
 
     const getStorageKey = useCallback(() => task ? `task-edit-${task.id}` : "task-new-data", [task]);
 
@@ -75,6 +76,22 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
     useEffect(() => {
         if (open && organization) {
             setSubmitting(false); // Reset submitting on open
+            setIsInitialized(false); // Reset initialization on open
+
+            // Reset formData to defaults immediately when opening to avoid showing previous task data
+            setSelectedProjectIds([]);
+            setFormData({
+                title: "",
+                description: "",
+                status: "ideas",
+                priority: "medium",
+                projectId: "",
+                versionId: "",
+                assigneeId: "none",
+                imageUrls: "",
+                type: null
+            });
+
             Promise.all([
                 getProjects(organization.id),
                 getVersions(organization.id),
@@ -83,10 +100,6 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                 setProjects(p);
                 setVersions(v);
                 setMembers(m);
-
-                // Try to load from localStorage first
-                const loaded = loadState();
-                if (loaded) return;
 
                 if (task) {
                     setSelectedProjectIds([task.projectId]);
@@ -101,31 +114,56 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                         imageUrls: task.images?.join('\n') || "",
                         type: task.type || null
                     });
+                    setIsInitialized(true);
                 } else {
-                    const defaultProject = p.length > 0 ? [p[0].id] : [];
-                    setSelectedProjectIds(defaultProject);
-                    setFormData({
-                        title: "",
-                        description: "",
-                        status: "ideas",
-                        priority: "medium",
-                        projectId: defaultProject[0] || "",
-                        versionId: "",
-                        assigneeId: "none",
-                        imageUrls: "",
-                        type: null
-                    });
+                    // Try to load from localStorage for new tasks
+                    const loaded = loadState();
+                    if (!loaded) {
+                        const defaultProject = p.length > 0 ? [p[0].id] : [];
+                        setSelectedProjectIds(defaultProject);
+                        setFormData({
+                            title: "",
+                            description: "",
+                            status: "ideas",
+                            priority: "medium",
+                            projectId: defaultProject[0] || "",
+                            versionId: "",
+                            assigneeId: "none",
+                            imageUrls: "",
+                            type: null
+                        });
+                    }
+                    setIsInitialized(true);
                 }
             });
         }
     }, [open, task, organization, loadState]);
 
-    // Save formData to localStorage while modal is open
+    // Save formData to localStorage while modal is open, only if initialized
     useEffect(() => {
-        if (open) {
+        if (open && isInitialized) {
             localStorage.setItem(getStorageKey(), JSON.stringify(formData));
         }
-    }, [formData, open, getStorageKey]);
+    }, [formData, open, getStorageKey, isInitialized]);
+
+    // Cleanup when modal closes to prevent cross-contamination
+    useEffect(() => {
+        if (!open) {
+            setIsInitialized(false);
+            setFormData({
+                title: "",
+                description: "",
+                status: "ideas",
+                priority: "medium",
+                projectId: "",
+                versionId: "",
+                assigneeId: "none",
+                imageUrls: "",
+                type: null
+            });
+            setSelectedProjectIds([]);
+        }
+    }, [open]);
 
     const toggleProject = (projectId: string) => {
         // If editing existing task, do not allow multi-select or changing project easily (complex)
