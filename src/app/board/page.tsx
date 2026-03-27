@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/kanban/column";
 import { TaskModal } from "@/components/kanban/task-modal";
-import { Task, Project, Version, TaskStatus } from "@/types";
-import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask, updateTask } from "@/lib/api";
+import { Task, Project, Version, TaskStatus, TeamMember } from "@/types";
+import { getTasks, getProjects, getVersions, updateTaskStatus, deleteTask, updateTask, getMembers } from "@/lib/api";
 import { useProject } from "@/context/project-context";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/language-context";
@@ -41,6 +41,7 @@ export default function BoardPage() {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [versions, setVersions] = useState<Version[]>([]);
+    const [members, setMembers] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -163,14 +164,16 @@ export default function BoardPage() {
     async function fetchData() {
         if (!organization) return;
         try {
-            const [t, p, v] = await Promise.all([
+            const [t, p, v, m] = await Promise.all([
                 getTasks(organization.id),
                 getProjects(organization.id),
-                getVersions(organization.id)
+                getVersions(organization.id),
+                getMembers(organization.id)
             ]);
             setTasks(t);
             setProjects(p);
             setVersions(v);
+            setMembers(m);
         } catch (e) {
             console.error(e);
         } finally {
@@ -503,6 +506,9 @@ export default function BoardPage() {
                 task={selectedTask}
                 onSuccess={handleModalSuccess}
                 selectedTaskIds={selectedTaskIds}
+                projects={projects}
+                versions={versions}
+                members={members}
             />
 
             <ConfirmDialog

@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Task, Project, Version, TeamMember, TaskStatus, TaskPriority } from "@/types";
-import { createTask, updateTask, getProjects, getVersions, getMembers } from "@/lib/api";
+import { createTask, updateTask } from "@/lib/api";
 import {
     DropdownMenu,
     DropdownMenuCheckboxItem,
@@ -25,17 +25,17 @@ interface TaskModalProps {
     task?: Task | null;
     onSuccess: () => void;
     selectedTaskIds?: string[];
+    projects: Project[];
+    versions: Version[];
+    members: TeamMember[];
 }
 
-export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds }: TaskModalProps) {
+export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds, projects, versions, members }: TaskModalProps) {
     const { toast } = useToast();
     const { t } = useLanguage();
     const { organization } = useAuth();
     const [submitting, setSubmitting] = useState(false);
-    const [projects, setProjects] = useState<Project[]>([]);
     const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
-    const [versions, setVersions] = useState<Version[]>([]);
-    const [members, setMembers] = useState<TeamMember[]>([]);
     const [isInitialized, setIsInitialized] = useState(false);
 
     const getStorageKey = useCallback(() => task ? `task-edit-${task.id}` : "task-new-data", [task]);
@@ -92,52 +92,42 @@ export function TaskModal({ open, onOpenChange, task, onSuccess, selectedTaskIds
                 type: null
             });
 
-            Promise.all([
-                getProjects(organization.id),
-                getVersions(organization.id),
-                getMembers(organization.id)
-            ]).then(([p, v, m]) => {
-                setProjects(p);
-                setVersions(v);
-                setMembers(m);
-
-                if (task) {
-                    setSelectedProjectIds([task.projectId]);
+            if (task) {
+                setSelectedProjectIds([task.projectId]);
+                setFormData({
+                    title: task.title,
+                    description: task.description || "",
+                    status: task.status,
+                    priority: task.priority,
+                    projectId: task.projectId,
+                    versionId: task.versionId || "",
+                    assigneeId: task.assigneeId || "none",
+                    imageUrls: task.images?.join('\n') || "",
+                    type: task.type || null
+                });
+                setIsInitialized(true);
+            } else {
+                // Try to load from localStorage for new tasks
+                const loaded = loadState();
+                if (!loaded) {
+                    const defaultProject = projects.length > 0 ? [projects[0].id] : [];
+                    setSelectedProjectIds(defaultProject);
                     setFormData({
-                        title: task.title,
-                        description: task.description || "",
-                        status: task.status,
-                        priority: task.priority,
-                        projectId: task.projectId,
-                        versionId: task.versionId || "",
-                        assigneeId: task.assigneeId || "none",
-                        imageUrls: task.images?.join('\n') || "",
-                        type: task.type || null
+                        title: "",
+                        description: "",
+                        status: "ideas",
+                        priority: "medium",
+                        projectId: defaultProject[0] || "",
+                        versionId: "",
+                        assigneeId: "none",
+                        imageUrls: "",
+                        type: null
                     });
-                    setIsInitialized(true);
-                } else {
-                    // Try to load from localStorage for new tasks
-                    const loaded = loadState();
-                    if (!loaded) {
-                        const defaultProject = p.length > 0 ? [p[0].id] : [];
-                        setSelectedProjectIds(defaultProject);
-                        setFormData({
-                            title: "",
-                            description: "",
-                            status: "ideas",
-                            priority: "medium",
-                            projectId: defaultProject[0] || "",
-                            versionId: "",
-                            assigneeId: "none",
-                            imageUrls: "",
-                            type: null
-                        });
-                    }
-                    setIsInitialized(true);
                 }
-            });
+                setIsInitialized(true);
+            }
         }
-    }, [open, task, organization, loadState]);
+    }, [open, task, organization, loadState, projects]);
 
     // Save formData to localStorage while modal is open, only if initialized
     useEffect(() => {
