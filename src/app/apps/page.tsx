@@ -212,7 +212,7 @@ export default function AppsPage() {
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">{t('apps.name')}</Label>
-                            <Input id="name" placeholder="FlowOS" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
+                            <Input id="name" placeholder="VBoards" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} required />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">

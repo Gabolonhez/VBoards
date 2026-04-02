@@ -6,19 +6,19 @@ export const users: Profile[] = [
         id: "1",
         full_name: "Sarah Chen",
         avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-        email: "sarah@flowos.app",
+        email: "sarah@vboards.app",
     },
     {
         id: "2",
         full_name: "Mike Johnson",
         avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-        email: "mike@flowos.app",
+        email: "mike@vboards.app",
     },
     {
         id: "3",
         full_name: "Alex Kim",
         avatar_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
-        email: "alex@flowos.app",
+        email: "alex@vboards.app",
     },
 ];
 

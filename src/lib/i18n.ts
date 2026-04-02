@@ -229,7 +229,7 @@ export const translations = {
             }
         },
         auth: {
-            login_title: "Access FlowOS",
+            login_title: "Access VBoards",
             login_subtitle: "Enter your credentials to continue",
             email: "E-mail",
             password: "Password",
@@ -237,7 +237,7 @@ export const translations = {
             no_account: "Don't have an account?",
             create_account: "Create account",
             register_title: "Create account",
-            register_subtitle: "Start managing your projects with FlowOS",
+            register_subtitle: "Start managing your projects with VBoards",
             full_name: "Full Name",
             org_name: "Organization / Company Name",
             register_button: "Create account",
@@ -484,7 +484,7 @@ export const translations = {
             }
         },
         auth: {
-            login_title: "Acessar FlowOS",
+            login_title: "Acessar VBoards",
             login_subtitle: "Entre com suas credenciais para continuar",
             email: "E-mail",
             password: "Senha",
@@ -738,7 +738,7 @@ export const translations = {
             }
         },
         auth: {
-            login_title: "Acceder a FlowOS",
+            login_title: "Acceder a VBoards",
             login_subtitle: "Introduce tus credenciales para continuar",
             email: "Correo electrónico",
             password: "Contraseña",
@@ -746,7 +746,7 @@ export const translations = {
             no_account: "¿No tienes una cuenta?",
             create_account: "Crear cuenta",
             register_title: "Crear cuenta",
-            register_subtitle: "Comienza a gestionar tus proyectos con FlowOS",
+            register_subtitle: "Comienza a gestionar tus proyectos con VBoards",
             full_name: "Nombre completo",
             org_name: "Nombre de la Organización / Empresa",
             register_button: "Crear cuenta",
