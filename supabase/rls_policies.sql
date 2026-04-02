@@ -6,126 +6,75 @@ ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_invitations ENABLE ROW LEVEL SECURITY;
 
--- 2. Organizations Policies
--- Allow users to see organizations they are members of
+-- 2. Helper function to check membership without recursion
+-- SECURITY DEFINER bypasses RLS, which is necessary to break the infinite loop
+CREATE OR REPLACE FUNCTION public.check_is_org_member(org_id uuid)
+RETURNS boolean AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.organization_members
+    WHERE organization_members.organization_id = org_id
+    AND organization_members.user_id = auth.uid()
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 3. Organizations Policies
 CREATE POLICY "Users can view their organizations" ON organizations
 FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM organization_members
-    WHERE organization_members.organization_id = organizations.id
-    AND organization_members.user_id = auth.uid()
-  )
+  auth.uid() = owner_id OR public.check_is_org_member(id)
 );
 
--- 3. Organization Members Policies
--- Allow users to see other members of their organizations
+CREATE POLICY "Authenticated users can create organizations" ON organizations
+FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Owners can update their organizations" ON organizations
+FOR UPDATE USING (auth.uid() = owner_id);
+
+CREATE POLICY "Owners can delete their organizations" ON organizations
+FOR DELETE USING (auth.uid() = owner_id);
+
+-- 4. Organization Members Policies
 CREATE POLICY "Users can view members of their organizations" ON organization_members
 FOR SELECT USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
+  user_id = auth.uid() OR public.check_is_org_member(organization_id)
 );
 
--- 4. Projects Policies
-CREATE POLICY "Users can view projects in their organizations" ON projects
-FOR SELECT USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
+CREATE POLICY "Authenticated users can join organizations" ON organization_members
+FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
-CREATE POLICY "Users can insert projects in their organizations" ON projects
-FOR INSERT WITH CHECK (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
-
-CREATE POLICY "Users can update projects in their organizations" ON projects
-FOR UPDATE USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
-
-CREATE POLICY "Users can delete projects in their organizations" ON projects
-FOR DELETE USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
-
--- 5. Team Members Policies
-CREATE POLICY "Users can view team members in their organizations" ON team_members
-FOR SELECT USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
-
-CREATE POLICY "Users can manage team members in their organizations" ON team_members
+CREATE POLICY "Owners can manage members" ON organization_members
 FOR ALL USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
+  EXISTS (
+    SELECT 1 FROM organizations
+    WHERE organizations.id = organization_members.organization_id
+    AND organizations.owner_id = auth.uid()
   )
 );
 
--- 6. Tasks Policies
-CREATE POLICY "Users can access tasks in their organizations" ON tasks
-FOR ALL USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
+-- 5. Data Policies (Projects, Team Members, Tasks, Versions, Documents, Invitations)
+-- All these use the helper function for simple, non-recursive access control
+CREATE POLICY "Users can access projects" ON projects
+FOR ALL USING (public.check_is_org_member(organization_id));
 
--- 7. Versions Policies
-CREATE POLICY "Users can access versions in their organizations" ON versions
-FOR ALL USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-    ) as user_orgs
-  )
-);
+CREATE POLICY "Users can access team members" ON team_members
+FOR ALL USING (public.check_is_org_member(organization_id));
 
--- 8. Documents Policies
-CREATE POLICY "Users can access documents in their organizations" ON documents
-FOR ALL USING (
-  organization_id IN (
-    SELECT org_id FROM (
-      SELECT organization_id as org_id FROM organization_members
-      WHERE user_id = auth.uid()
-) as user_orgs
-  )
-);
+CREATE POLICY "Users can access tasks" ON tasks
+FOR ALL USING (public.check_is_org_member(organization_id));
 
--- 9. Function and Trigger for claiming data (First user registration)
+CREATE POLICY "Users can access versions" ON versions
+FOR ALL USING (public.check_is_org_member(organization_id));
+
+CREATE POLICY "Users can access documents" ON documents
+FOR ALL USING (public.check_is_org_member(organization_id));
+
+CREATE POLICY "Users can manage invitations" ON organization_invitations
+FOR ALL USING (public.check_is_org_member(organization_id));
+
+-- 6. Function and Trigger for claiming data (First user registration)
 -- This function runs when the FIRST organization is created
 -- It links all existing data (with null organization_id) to that organization
 CREATE OR REPLACE FUNCTION public.handle_first_org_claim() 
@@ -152,6 +101,9 @@ BEGIN
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Drop trigger if exists for idempotency
+DROP TRIGGER IF EXISTS on_organization_created ON public.organizations;
 
 CREATE TRIGGER on_organization_created
     AFTER INSERT ON public.organizations
