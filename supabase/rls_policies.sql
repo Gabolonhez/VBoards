@@ -17,6 +17,9 @@ BEGIN
     SELECT 1 FROM public.organization_members
     WHERE organization_members.organization_id = org_id
     AND organization_members.user_id = auth.uid()
+  ) OR EXISTS (
+    SELECT 1 FROM public.organizations
+    WHERE id = org_id AND owner_id = auth.uid()
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
