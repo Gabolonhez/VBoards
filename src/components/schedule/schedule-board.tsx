@@ -4,16 +4,26 @@ import { useState } from "react";
 import {
     DndContext,
     DragEndEvent,
+    DragStartEvent,
+    DragOverlay,
+    closestCorners,
     useSensor,
     useSensors,
     PointerSensor,
     useDroppable,
 } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { ScheduleItem, ScheduleStatus, TeamMember } from "@/types";
 import { useLanguage } from "@/context/language-context";
 import { cn } from "@/lib/utils";
 import { ScheduleCard } from "./schedule-card";
 import { Input } from "@/components/ui/input";
+
+export interface ScheduleReorderUpdate {
+    id: string;
+    status: ScheduleStatus;
+    position: number;
+}
 
 interface ScheduleBoardProps {
     items: ScheduleItem[];
@@ -21,7 +31,7 @@ interface ScheduleBoardProps {
     onCreate: (status: ScheduleStatus, title: string) => void;
     onUpdate: (id: string, updates: Partial<ScheduleItem>) => void;
     onDelete: (id: string) => void;
-    onStatusChange: (id: string, status: ScheduleStatus) => void;
+    onReorder: (updates: ScheduleReorderUpdate[]) => void;
 }
 
 const COLUMNS: { id: ScheduleStatus; titleKey: string; dot: string }[] = [
@@ -29,6 +39,10 @@ const COLUMNS: { id: ScheduleStatus; titleKey: string; dot: string }[] = [
     { id: "doing", titleKey: "schedule.doing", dot: "bg-amber-400" },
     { id: "done", titleKey: "schedule.done", dot: "bg-emerald-400" },
 ];
+
+function byPosition(a: ScheduleItem, b: ScheduleItem) {
+    return (a.position ?? 0) - (b.position ?? 0);
+}
 
 function BoardColumn({
     id,
@@ -78,22 +92,24 @@ function BoardColumn({
                     isOver && "bg-primary/5 border-primary/40"
                 )}
             >
-                {items.length === 0 && !adding && (
-                    <p className="text-sm text-muted-foreground/50 px-2 py-1">{t("schedule.empty_column")}</p>
-                )}
+                <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+                    {items.length === 0 && !adding && (
+                        <p className="text-sm text-muted-foreground/50 px-2 py-1">{t("schedule.empty_column")}</p>
+                    )}
 
-                {items.map((item) => (
-                    <ScheduleCard
-                        key={item.id}
-                        item={item}
-                        members={members}
-                        onUpdate={onUpdate}
-                        onDelete={onDelete}
-                    />
-                ))}
+                    {items.map((item) => (
+                        <ScheduleCard
+                            key={item.id}
+                            item={item}
+                            members={members}
+                            onUpdate={onUpdate}
+                            onDelete={onDelete}
+                        />
+                    ))}
+                </SortableContext>
 
-                {id === "todo" && (
-                    adding ? (
+                {id === "todo" &&
+                    (adding ? (
                         <Input
                             autoFocus
                             value={title2}
@@ -111,38 +127,87 @@ function BoardColumn({
                         />
                     ) : (
                         <button
+                            type="button"
                             onClick={() => setAdding(true)}
                             className="w-full text-center text-sm text-muted-foreground border border-dashed border-border rounded-md py-2 hover:text-foreground hover:border-primary/40 transition-colors"
                         >
                             {t("schedule.new_item")}
                         </button>
-                    )
-                )}
+                    ))}
             </div>
         </div>
     );
 }
 
-export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onStatusChange }: ScheduleBoardProps) {
+export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onReorder }: ScheduleBoardProps) {
     const { t } = useLanguage();
+    const [activeId, setActiveId] = useState<string | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
     );
 
-    function handleDragEnd(event: DragEndEvent) {
-        const { active, over } = event;
-        if (!over) return;
-        const itemId = active.id as string;
-        const newStatus = over.id as ScheduleStatus;
-        const current = items.find((i) => i.id === itemId);
-        if (current && current.status !== newStatus) {
-            onStatusChange(itemId, newStatus);
-        }
+    const columnItems = (status: ScheduleStatus) => items.filter((i) => i.status === status).sort(byPosition);
+
+    function handleDragStart(event: DragStartEvent) {
+        setActiveId(event.active.id as string);
     }
 
+    function handleDragEnd(event: DragEndEvent) {
+        const { active, over } = event;
+        setActiveId(null);
+        if (!over) return;
+
+        const activeItem = items.find((i) => i.id === active.id);
+        if (!activeItem) return;
+
+        const overId = over.id as string;
+        const isColumn = COLUMNS.some((c) => c.id === overId);
+        const overItem = items.find((i) => i.id === overId);
+        const targetStatus = (isColumn ? (overId as ScheduleStatus) : overItem?.status) as ScheduleStatus | undefined;
+        if (!targetStatus) return;
+
+        // No-op: dropped on itself, same column same neighbour
+        if (overId === active.id) return;
+
+        const targetList = columnItems(targetStatus).filter((i) => i.id !== activeItem.id);
+        let insertIndex = targetList.length;
+        if (overItem && !isColumn) {
+            const idx = targetList.findIndex((i) => i.id === overItem.id);
+            insertIndex = idx < 0 ? targetList.length : idx;
+        }
+
+        const newColumn = [
+            ...targetList.slice(0, insertIndex),
+            activeItem,
+            ...targetList.slice(insertIndex),
+        ];
+
+        const updates: ScheduleReorderUpdate[] = newColumn.map((it, idx) => ({
+            id: it.id,
+            status: targetStatus,
+            position: idx,
+        }));
+
+        // Re-index source column when moving across columns
+        if (activeItem.status !== targetStatus) {
+            columnItems(activeItem.status)
+                .filter((i) => i.id !== activeItem.id)
+                .forEach((it, idx) => updates.push({ id: it.id, status: activeItem.status, position: idx }));
+        }
+
+        onReorder(updates);
+    }
+
+    const activeItem = activeId ? items.find((i) => i.id === activeId) : null;
+
     return (
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+        >
             <div className="flex h-full gap-6 overflow-x-auto pb-4">
                 {COLUMNS.map((col) => (
                     <BoardColumn
@@ -150,7 +215,7 @@ export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, on
                         id={col.id}
                         title={t(col.titleKey)}
                         dot={col.dot}
-                        items={items.filter((i) => i.status === col.id)}
+                        items={columnItems(col.id)}
                         members={members}
                         onCreate={onCreate}
                         onUpdate={onUpdate}
@@ -158,6 +223,14 @@ export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, on
                     />
                 ))}
             </div>
+
+            <DragOverlay>
+                {activeItem ? (
+                    <div className="bg-card rounded-md border shadow-lg ring-2 ring-primary px-3 py-3 text-sm font-medium cursor-grabbing">
+                        {activeItem.title}
+                    </div>
+                ) : null}
+            </DragOverlay>
         </DndContext>
     );
 }

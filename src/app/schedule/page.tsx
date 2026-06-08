@@ -6,7 +6,6 @@ import {
     getScheduleItems,
     createScheduleItem,
     updateScheduleItem,
-    updateScheduleItemStatus,
     deleteScheduleItem,
     getScheduleNote,
     upsertScheduleNote,
@@ -16,7 +15,7 @@ import { ScheduleItem, ScheduleScope, ScheduleStatus, TeamMember } from "@/types
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
-import { ScheduleBoard } from "@/components/schedule/schedule-board";
+import { ScheduleBoard, ScheduleReorderUpdate } from "@/components/schedule/schedule-board";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
@@ -107,9 +106,10 @@ export default function SchedulePage() {
     async function handleCreate(status: ScheduleStatus, title: string) {
         if (!organization) return;
         const assigneeId = assigneeFilter !== "all" ? assigneeFilter : null;
+        const position = items.filter((i) => i.scope === scope && i.status === status).length;
         try {
             const created = await createScheduleItem(
-                { scope, status, title, assigneeId, subtasks: [] },
+                { scope, status, title, assigneeId, subtasks: [], position },
                 organization.id
             );
             setItems((prev) => [...prev, created]);
@@ -140,12 +140,22 @@ export default function SchedulePage() {
         }
     }
 
-    async function handleStatusChange(id: string, status: ScheduleStatus) {
-        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, status } : i)));
+    async function handleReorder(updates: ScheduleReorderUpdate[]) {
+        if (updates.length === 0) return;
+        // Optimistic update
+        setItems((prev) =>
+            prev.map((i) => {
+                const u = updates.find((x) => x.id === i.id);
+                return u ? { ...i, status: u.status, position: u.position } : i;
+            })
+        );
         try {
-            await updateScheduleItemStatus(id, status);
+            await Promise.all(
+                updates.map((u) => updateScheduleItem(u.id, { status: u.status, position: u.position }))
+            );
         } catch (e) {
             console.error(e);
+            toast({ title: t("common.error"), description: t("schedule.save_error"), variant: "destructive" });
             fetchData();
         }
     }
@@ -239,7 +249,7 @@ export default function SchedulePage() {
                     onCreate={handleCreate}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
-                    onStatusChange={handleStatusChange}
+                    onReorder={handleReorder}
                 />
             </div>
 

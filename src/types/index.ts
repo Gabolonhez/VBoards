@@ -106,6 +106,7 @@ export interface ScheduleItem {
   status: ScheduleStatus;
   title: string;
   description?: string;
+  date?: string | null; // YYYY-MM-DD
   assigneeId?: string | null;
   assignee?: TeamMember;
   subtasks?: ScheduleSubtask[];

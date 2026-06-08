@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS public.schedule_items (
     status text NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'doing', 'done')),
     title text NOT NULL,
     description text,
+    date date,
     assignee_id uuid REFERENCES public.team_members(id) ON DELETE SET NULL,
     subtasks jsonb NOT NULL DEFAULT '[]'::jsonb,
     position integer NOT NULL DEFAULT 0,

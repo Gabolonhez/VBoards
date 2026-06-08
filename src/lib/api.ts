@@ -447,6 +447,7 @@ function mapScheduleItem(s: any): ScheduleItem {
         status: s.status,
         title: s.title,
         description: s.description || undefined,
+        date: s.date || null,
         assigneeId: s.assignee_id,
         assignee: s.assignee ? { ...s.assignee, avatarUrl: s.assignee.avatar_url, createdAt: s.assignee.created_at } : undefined,
         subtasks: Array.isArray(s.subtasks) ? s.subtasks : [],
@@ -473,6 +474,7 @@ export async function createScheduleItem(item: Partial<ScheduleItem>, organizati
         status: item.status || "todo",
         title: item.title,
         description: item.description,
+        date: item.date || null,
         assignee_id: item.assigneeId || null,
         subtasks: item.subtasks || [],
         position: item.position ?? 0
@@ -487,6 +489,7 @@ export async function updateScheduleItem(id: string, updates: Partial<ScheduleIt
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.title !== undefined) dbUpdates.title = updates.title;
     if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.date !== undefined) dbUpdates.date = updates.date || null;
     if (updates.assigneeId !== undefined) dbUpdates.assignee_id = updates.assigneeId || null;
     if (updates.subtasks !== undefined) dbUpdates.subtasks = updates.subtasks;
     if (updates.position !== undefined) dbUpdates.position = updates.position;

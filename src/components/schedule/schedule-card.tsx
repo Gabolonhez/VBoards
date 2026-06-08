@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { ScheduleItem, ScheduleSubtask, TeamMember } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -16,7 +17,19 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, GripVertical, Trash, Plus, X, Check } from "lucide-react";
+import { ChevronRight, GripVertical, Trash, Plus, X, Check, CalendarDays } from "lucide-react";
+
+const LOCALE_MAP: Record<string, string> = { pt: "pt-BR", es: "es-ES", en: "en-US" };
+
+function formatDate(date: string, locale: string) {
+    // date is 'YYYY-MM-DD' — parse as local to avoid timezone shift
+    const [y, m, d] = date.split("-").map(Number);
+    if (!y || !m || !d) return date;
+    return new Date(y, m - 1, d).toLocaleDateString(LOCALE_MAP[locale] || "en-US", {
+        day: "2-digit",
+        month: "short",
+    });
+}
 
 interface ScheduleCardProps {
     item: ScheduleItem;
@@ -30,18 +43,19 @@ function memberInitial(name?: string) {
 }
 
 export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCardProps) {
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [expanded, setExpanded] = useState(false);
     const [newSubtask, setNewSubtask] = useState("");
 
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: item.id,
         data: item,
     });
 
-    const style = transform
-        ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` }
-        : undefined;
+    const style = {
+        transform: CSS.Translate.toString(transform),
+        transition,
+    };
 
     const subtasks = item.subtasks || [];
     const doneCount = subtasks.filter((s) => s.done).length;
@@ -102,6 +116,13 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
                     <span className="text-sm font-medium line-clamp-2">{item.title}</span>
                 </button>
 
+                {item.date && (
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0 bg-muted/60 rounded px-1.5 py-0.5">
+                        <CalendarDays className="h-3 w-3" />
+                        {formatDate(item.date, language)}
+                    </span>
+                )}
+
                 {subtasks.length > 0 && (
                     <span className="text-[11px] font-mono text-muted-foreground shrink-0">
                         {doneCount}/{subtasks.length}
@@ -155,6 +176,28 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
 
             {expanded && (
                 <div className="px-3 pb-3 pl-9 space-y-2 border-t border-border/50 pt-2">
+                    <div className="flex items-center gap-2">
+                        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="text-xs text-muted-foreground w-10 shrink-0">{t("schedule.date_label")}</span>
+                        <input
+                            type="date"
+                            value={item.date || ""}
+                            title={t("schedule.date_label")}
+                            aria-label={t("schedule.date_label")}
+                            onChange={(e) => onUpdate(item.id, { date: e.target.value || null })}
+                            className="h-7 flex-1 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] scheme-dark"
+                        />
+                        {item.date && (
+                            <button
+                                type="button"
+                                onClick={() => onUpdate(item.id, { date: null })}
+                                className="text-xs text-muted-foreground hover:text-red-500 shrink-0"
+                            >
+                                {t("schedule.clear_date")}
+                            </button>
+                        )}
+                    </div>
+
                     {subtasks.map((s) => (
                         <div key={s.id} className="flex items-center gap-2 group/sub">
                             <Checkbox

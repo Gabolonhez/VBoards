@@ -8,7 +8,7 @@ export const translations = {
             roadmap: "Versions",
             processes: "Processes",
             apps: "Projects",
-            schedule: "Schedule",
+            schedule: "Planning",
             settings: "Settings",
             collapse: "Collapse",
             search: "Search...",
@@ -115,7 +115,7 @@ export const translations = {
             tbd: "TBD"
         },
         schedule: {
-            title: "Schedule",
+            title: "Planning",
             subtitle: "Month, week and day: the rhythm that drives the Journey.",
             all: "All",
             month: "Month",
@@ -128,6 +128,8 @@ export const translations = {
             new_item_placeholder: "Item title...",
             add_subtask: "+ add subtask",
             subtask_placeholder: "Subtask...",
+            date_label: "Date",
+            clear_date: "Clear",
             day_notes: "Day Notes",
             notes_placeholder: "Reflections, blockers, learnings...",
             empty_column: "—",
@@ -286,7 +288,7 @@ export const translations = {
             roadmap: "Versões",
             processes: "Processos",
             apps: "Projetos",
-            schedule: "Cronograma",
+            schedule: "Planejamento",
             settings: "Configurações",
             collapse: "Recolher",
             search: "Buscar...",
@@ -407,6 +409,8 @@ export const translations = {
             new_item_placeholder: "Título do item...",
             add_subtask: "+ adicionar subtarefa",
             subtask_placeholder: "Subtarefa...",
+            date_label: "Data",
+            clear_date: "Limpar",
             day_notes: "Notas do Dia",
             notes_placeholder: "Reflexões, bloqueios, aprendizados...",
             empty_column: "—",
@@ -414,7 +418,7 @@ export const translations = {
             item_created: "Item criado",
             item_updated: "Item atualizado",
             item_deleted: "Item excluído",
-            load_error: "Falha ao carregar cronograma",
+            load_error: "Falha ao carregar o planejamento",
             save_error: "Falha ao salvar"
         },
         apps: {
@@ -566,7 +570,7 @@ export const translations = {
             roadmap: "Hoja de Ruta",
             processes: "Procesos",
             apps: "Proyectos",
-            schedule: "Cronograma",
+            schedule: "Planificación",
             settings: "Ajustes",
             collapse: "Colapsar",
             search: "Buscar...",
@@ -674,7 +678,7 @@ export const translations = {
             tbd: "Por definir"
         },
         schedule: {
-            title: "Cronograma",
+            title: "Planificación",
             subtitle: "Mes, semana y día: el ritmo que mueve la Trayectoria.",
             all: "Todos",
             month: "Mes",
@@ -687,6 +691,8 @@ export const translations = {
             new_item_placeholder: "Título del elemento...",
             add_subtask: "+ añadir subtarea",
             subtask_placeholder: "Subtarea...",
+            date_label: "Fecha",
+            clear_date: "Limpiar",
             day_notes: "Notas del Día",
             notes_placeholder: "Reflexiones, bloqueos, aprendizajes...",
             empty_column: "—",
@@ -694,7 +700,7 @@ export const translations = {
             item_created: "Elemento creado",
             item_updated: "Elemento actualizado",
             item_deleted: "Elemento eliminado",
-            load_error: "Error al cargar el cronograma",
+            load_error: "Error al cargar la planificación",
             save_error: "Error al guardar"
         },
         apps: {
