@@ -3,6 +3,8 @@ export type TaskStatus = 'ideas' | 'backlog' | 'in_progress' | 'code_review' | '
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type VersionStatus = 'planned' | 'in_development' | 'in_stores' | 'deprecated';
 export type DocType = 'process' | 'document';
+export type ScheduleScope = 'month' | 'week' | 'day';
+export type ScheduleStatus = 'todo' | 'doing' | 'done';
 
 export interface Profile {
   id: string;
@@ -89,6 +91,34 @@ export interface Doc {
   flowDiagramJson?: any;
   updatedAt?: string;
   createdAt?: string;
+}
+
+export interface ScheduleSubtask {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+export interface ScheduleItem {
+  id: string;
+  organizationId?: string;
+  scope: ScheduleScope;
+  status: ScheduleStatus;
+  title: string;
+  description?: string;
+  assigneeId?: string | null;
+  assignee?: TeamMember;
+  subtasks?: ScheduleSubtask[];
+  position?: number;
+  createdAt?: string;
+}
+
+export interface ScheduleNote {
+  id?: string;
+  organizationId?: string;
+  ownerKey: string; // assignee id or 'all'
+  content: string;
+  updatedAt?: string;
 }
 
 export interface Activity {

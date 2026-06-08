@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { Task, Version, Project, Doc, TaskStatus, TeamMember, Organization } from "@/types";
+import { Task, Version, Project, Doc, TaskStatus, TeamMember, Organization, ScheduleItem, ScheduleStatus, ScheduleNote } from "@/types";
 
 const supabase = createClient();
 
@@ -436,6 +436,101 @@ export async function inviteMember(email: string, role: string, organizationId: 
             invitation_id: invite.id
         }).eq("id", existing.id);
     }
+}
+
+// Schedule (Cronograma)
+function mapScheduleItem(s: any): ScheduleItem {
+    return {
+        id: s.id,
+        organizationId: s.organization_id,
+        scope: s.scope,
+        status: s.status,
+        title: s.title,
+        description: s.description || undefined,
+        assigneeId: s.assignee_id,
+        assignee: s.assignee ? { ...s.assignee, avatarUrl: s.assignee.avatar_url, createdAt: s.assignee.created_at } : undefined,
+        subtasks: Array.isArray(s.subtasks) ? s.subtasks : [],
+        position: s.position ?? 0,
+        createdAt: s.created_at
+    };
+}
+
+export async function getScheduleItems(organizationId: string): Promise<ScheduleItem[]> {
+    const { data, error } = await supabase
+        .from("schedule_items")
+        .select(`*, assignee:team_members(*)`)
+        .eq("organization_id", organizationId)
+        .order("position", { ascending: true })
+        .order("created_at", { ascending: true });
+    if (error) throw error;
+    return data.map(mapScheduleItem);
+}
+
+export async function createScheduleItem(item: Partial<ScheduleItem>, organizationId: string): Promise<ScheduleItem> {
+    const { data, error } = await supabase.from("schedule_items").insert({
+        organization_id: organizationId,
+        scope: item.scope || "month",
+        status: item.status || "todo",
+        title: item.title,
+        description: item.description,
+        assignee_id: item.assigneeId || null,
+        subtasks: item.subtasks || [],
+        position: item.position ?? 0
+    }).select(`*, assignee:team_members(*)`).single();
+    if (error) throw error;
+    return mapScheduleItem(data);
+}
+
+export async function updateScheduleItem(id: string, updates: Partial<ScheduleItem>): Promise<void> {
+    const dbUpdates: any = {};
+    if (updates.scope !== undefined) dbUpdates.scope = updates.scope;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.assigneeId !== undefined) dbUpdates.assignee_id = updates.assigneeId || null;
+    if (updates.subtasks !== undefined) dbUpdates.subtasks = updates.subtasks;
+    if (updates.position !== undefined) dbUpdates.position = updates.position;
+
+    const { error } = await supabase.from("schedule_items").update(dbUpdates).eq("id", id);
+    if (error) throw error;
+}
+
+export async function updateScheduleItemStatus(id: string, status: ScheduleStatus): Promise<void> {
+    const { error } = await supabase.from("schedule_items").update({ status }).eq("id", id);
+    if (error) throw error;
+}
+
+export async function deleteScheduleItem(id: string): Promise<void> {
+    const { error } = await supabase.from("schedule_items").delete().eq("id", id);
+    if (error) throw error;
+}
+
+export async function getScheduleNote(organizationId: string, ownerKey: string): Promise<ScheduleNote | null> {
+    const { data, error } = await supabase
+        .from("schedule_notes")
+        .select("*")
+        .eq("organization_id", organizationId)
+        .eq("owner_key", ownerKey)
+        .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+        id: data.id,
+        organizationId: data.organization_id,
+        ownerKey: data.owner_key,
+        content: data.content || "",
+        updatedAt: data.updated_at
+    };
+}
+
+export async function upsertScheduleNote(organizationId: string, ownerKey: string, content: string): Promise<void> {
+    const { error } = await supabase.from("schedule_notes").upsert({
+        organization_id: organizationId,
+        owner_key: ownerKey,
+        content,
+        updated_at: new Date().toISOString()
+    }, { onConflict: "organization_id,owner_key" });
+    if (error) throw error;
 }
 
 // Stats
