@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import {
     getScheduleItems,
     createScheduleItem,
@@ -25,9 +25,71 @@ function memberInitial(name?: string) {
     return name?.trim()?.[0]?.toUpperCase() || "?";
 }
 
+// Today's date (YYYY-MM-DD) in Brazil timezone — 'en-CA' yields ISO-like format
+function todayInBrazil(): string {
+    return new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Sao_Paulo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).format(new Date());
+}
+
+function toISO(dt: Date): string {
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getDate()).padStart(2, "0");
+    return `${dt.getFullYear()}-${mm}-${dd}`;
+}
+
+function shiftDate(date: string, deltaDays: number): string {
+    const [y, m, d] = date.split("-").map(Number);
+    return toISO(new Date(y, m - 1, d + deltaDays));
+}
+
+function shiftMonth(date: string, delta: number): string {
+    const [y, m, d] = date.split("-").map(Number);
+    const target = new Date(y, m - 1 + delta, 1);
+    const daysInMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+    target.setDate(Math.min(d, daysInMonth));
+    return toISO(target);
+}
+
+// Monday–Sunday range containing the given date
+function weekRange(date: string): { start: string; end: string } {
+    const [y, m, d] = date.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const diffToMonday = (dt.getDay() + 6) % 7; // 0=Mon ... 6=Sun
+    const start = new Date(y, m - 1, d - diffToMonday);
+    const end = new Date(y, m - 1, d - diffToMonday + 6);
+    return { start: toISO(start), end: toISO(end) };
+}
+
+function localeOf(language: string): string {
+    return language === "pt" ? "pt-BR" : language === "es" ? "es-ES" : "en-US";
+}
+
+function fmtDayMonth(date: string, language: string): string {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(localeOf(language), { day: "2-digit", month: "short" });
+}
+
+function fmtMonthYear(date: string, language: string): string {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(localeOf(language), { month: "long", year: "numeric" });
+}
+
+// Does the item's date fall within the period defined by scope + anchor date?
+function matchesDate(itemDate: string | null | undefined, scope: ScheduleScope, anchor: string): boolean {
+    if (!itemDate) return false;
+    if (scope === "day") return itemDate === anchor;
+    if (scope === "month") return itemDate.slice(0, 7) === anchor.slice(0, 7);
+    const { start, end } = weekRange(anchor);
+    return itemDate >= start && itemDate <= end;
+}
+
 export default function SchedulePage() {
     const { organization } = useAuth();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const { toast } = useToast();
 
     const [items, setItems] = useState<ScheduleItem[]>([]);
@@ -36,6 +98,8 @@ export default function SchedulePage() {
 
     const [scope, setScope] = useState<ScheduleScope>("month");
     const [assigneeFilter, setAssigneeFilter] = useState<string>("all"); // 'all' | memberId
+    const [selectedDate, setSelectedDate] = useState<string>(() => todayInBrazil());
+    const [dateFilterActive, setDateFilterActive] = useState(true);
 
     const [note, setNote] = useState("");
     const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -99,9 +163,12 @@ export default function SchedulePage() {
         localStorage.setItem("vboards_schedule_assignee", id);
     };
 
-    const visibleItems = items.filter(
-        (i) => i.scope === scope && (assigneeFilter === "all" || i.assigneeId === assigneeFilter)
-    );
+    const visibleItems = items.filter((i) => {
+        if (i.scope !== scope) return false;
+        if (assigneeFilter !== "all" && i.assigneeId !== assigneeFilter) return false;
+        if (dateFilterActive && !matchesDate(i.date, scope, selectedDate)) return false;
+        return true;
+    });
 
     async function handleCreate(status: ScheduleStatus, title: string) {
         if (!organization) return;
@@ -109,7 +176,7 @@ export default function SchedulePage() {
         const position = items.filter((i) => i.scope === scope && i.status === status).length;
         try {
             const created = await createScheduleItem(
-                { scope, status, title, assigneeId, subtasks: [], position },
+                { scope, status, title, assigneeId, subtasks: [], position, date: selectedDate },
                 organization.id
             );
             setItems((prev) => [...prev, created]);
@@ -222,23 +289,95 @@ export default function SchedulePage() {
                     ))}
                 </div>
 
-                {/* Scope tabs */}
-                <div className="flex items-center gap-6 mt-4">
-                    {SCOPES.map((s) => (
+                {/* Scope tabs + date filter */}
+                <div className="flex items-end justify-between mt-4 gap-4 flex-wrap">
+                    <div className="flex items-center gap-6">
+                        {SCOPES.map((s) => (
+                            <button
+                                key={s}
+                                onClick={() => changeScope(s)}
+                                className={cn(
+                                    "relative pb-2 text-sm font-medium transition-colors",
+                                    scope === s ? "text-amber-400" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {t(`schedule.${s}`)}
+                                {scope === s && (
+                                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full" />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 pb-1">
                         <button
-                            key={s}
-                            onClick={() => changeScope(s)}
+                            type="button"
+                            aria-label="Previous"
+                            onClick={() =>
+                                setSelectedDate((d) =>
+                                    scope === "month" ? shiftMonth(d, -1) : shiftDate(d, scope === "week" ? -7 : -1)
+                                )
+                            }
+                            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </button>
+
+                        {scope === "day" ? (
+                            <div className="relative flex items-center">
+                                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground absolute left-2 pointer-events-none" />
+                                <input
+                                    type="date"
+                                    value={selectedDate}
+                                    title={t("schedule.date_label")}
+                                    aria-label={t("schedule.date_label")}
+                                    onChange={(e) => {
+                                        if (e.target.value) setSelectedDate(e.target.value);
+                                    }}
+                                    className="h-8 rounded-md border border-input bg-transparent pl-7 pr-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] scheme-dark"
+                                />
+                            </div>
+                        ) : (
+                            <span className="flex items-center gap-1.5 h-8 px-3 rounded-md border border-input text-sm capitalize min-w-[150px] justify-center">
+                                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                                {scope === "month"
+                                    ? fmtMonthYear(selectedDate, language)
+                                    : `${fmtDayMonth(weekRange(selectedDate).start, language)} – ${fmtDayMonth(weekRange(selectedDate).end, language)}`}
+                            </span>
+                        )}
+
+                        <button
+                            type="button"
+                            aria-label="Next"
+                            onClick={() =>
+                                setSelectedDate((d) =>
+                                    scope === "month" ? shiftMonth(d, 1) : shiftDate(d, scope === "week" ? 7 : 1)
+                                )
+                            }
+                            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                            <ChevronRight className="h-4 w-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedDate(todayInBrazil())}
+                            className="ml-1 px-2 py-1 rounded text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                        >
+                            {t("schedule.today")}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setDateFilterActive((a) => !a)}
                             className={cn(
-                                "relative pb-2 text-sm font-medium transition-colors",
-                                scope === s ? "text-amber-400" : "text-muted-foreground hover:text-foreground"
+                                "px-2 py-1 rounded-full text-xs font-medium transition-colors",
+                                !dateFilterActive
+                                    ? "bg-primary/20 text-primary"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                             )}
                         >
-                            {t(`schedule.${s}`)}
-                            {scope === s && (
-                                <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-amber-400 rounded-full" />
-                            )}
+                            {t("schedule.all_dates")}
                         </button>
-                    ))}
+                    </div>
                 </div>
             </header>
 
