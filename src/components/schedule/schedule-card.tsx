@@ -46,6 +46,16 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
     const { t, language } = useLanguage();
     const [expanded, setExpanded] = useState(false);
     const [newSubtask, setNewSubtask] = useState("");
+    const [titleDraft, setTitleDraft] = useState(item.title);
+
+    const saveTitle = () => {
+        const value = titleDraft.trim();
+        if (value && value !== item.title) {
+            onUpdate(item.id, { title: value });
+        } else {
+            setTitleDraft(item.title);
+        }
+    };
 
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
         id: item.id,
@@ -67,6 +77,15 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
 
     const removeSubtask = (subId: string) => {
         onUpdate(item.id, { subtasks: subtasks.filter((s) => s.id !== subId) });
+    };
+
+    const updateSubtaskText = (subId: string, text: string) => {
+        const value = text.trim();
+        const current = subtasks.find((s) => s.id === subId);
+        if (!current || !value || value === current.text) return;
+        onUpdate(item.id, {
+            subtasks: subtasks.map((s) => (s.id === subId ? { ...s, text: value } : s)),
+        });
     };
 
     const addSubtask = () => {
@@ -176,6 +195,22 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
 
             {expanded && (
                 <div className="px-3 pb-3 pl-9 space-y-2 border-t border-border/50 pt-2">
+                    <input
+                        value={titleDraft}
+                        onChange={(e) => setTitleDraft(e.target.value)}
+                        onBlur={saveTitle}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                                saveTitle();
+                                (e.target as HTMLInputElement).blur();
+                            }
+                            if (e.key === "Escape") setTitleDraft(item.title);
+                        }}
+                        title={t("common.title")}
+                        aria-label={t("common.title")}
+                        className="w-full h-8 rounded-md border border-input bg-transparent px-2 text-sm font-medium outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                    />
+
                     <div className="flex items-center gap-2">
                         <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <span className="text-xs text-muted-foreground w-10 shrink-0">{t("schedule.date_label")}</span>
@@ -205,15 +240,27 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
                                 onCheckedChange={() => toggleSubtask(s.id)}
                                 className="h-4 w-4"
                             />
-                            <span
+                            <input
+                                defaultValue={s.text}
+                                onBlur={(e) => updateSubtaskText(s.id, e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                                    if (e.key === "Escape") {
+                                        (e.target as HTMLInputElement).value = s.text;
+                                        (e.target as HTMLInputElement).blur();
+                                    }
+                                }}
+                                title={t("schedule.subtask_placeholder")}
+                                aria-label={t("schedule.subtask_placeholder")}
                                 className={cn(
-                                    "text-sm flex-1",
+                                    "text-sm flex-1 bg-transparent outline-none border-b border-transparent focus:border-input transition-colors",
                                     s.done && "line-through text-muted-foreground"
                                 )}
-                            >
-                                {s.text}
-                            </span>
+                            />
                             <button
+                                type="button"
+                                aria-label={t("common.delete")}
+                                title={t("common.delete")}
                                 onClick={() => removeSubtask(s.id)}
                                 className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
                             >
