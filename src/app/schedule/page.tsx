@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarDays, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
     getScheduleItems,
     createScheduleItem,
@@ -115,6 +122,7 @@ export default function SchedulePage() {
     const [assigneeFilter, setAssigneeFilter] = useState<string>("all"); // 'all' | memberId
     const [selectedDate, setSelectedDate] = useState<string>(() => todayInBrazil());
     const [dateFilterActive, setDateFilterActive] = useState(true);
+    const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
     const [note, setNote] = useState("");
     const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,8 +207,75 @@ export default function SchedulePage() {
 
     const changeScope = (s: ScheduleScope) => {
         setScope(s);
+        setSelectedIds([]);
         localStorage.setItem("vboards_schedule_scope", s);
     };
+
+    const toggleSelect = (id: string) =>
+        setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+    const clearSelection = () => setSelectedIds([]);
+
+    async function handleBulkStatus(status: ScheduleStatus) {
+        const ids = selectedIds;
+        if (ids.length === 0) return;
+        const base = items.filter((i) => i.scope === scope && i.status === status && !ids.includes(i.id)).length;
+        const updates = ids.map((id, idx) => ({ id, status, position: base + idx }));
+        setItems((prev) =>
+            prev.map((i) => {
+                const u = updates.find((x) => x.id === i.id);
+                return u ? { ...i, status: u.status, position: u.position } : i;
+            })
+        );
+        clearSelection();
+        try {
+            await Promise.all(updates.map((u) => updateScheduleItem(u.id, { status: u.status, position: u.position })));
+        } catch (e) {
+            console.error(e);
+            fetchData();
+        }
+    }
+
+    async function handleBulkScope(newScope: ScheduleScope) {
+        const ids = selectedIds;
+        if (ids.length === 0) return;
+        const fallbackDate = selectedDate;
+        setItems((prev) =>
+            prev.map((i) => {
+                if (!ids.includes(i.id)) return i;
+                const next = { ...i, scope: newScope };
+                if (newScope === "day" && !i.date) next.date = fallbackDate;
+                return next;
+            })
+        );
+        clearSelection();
+        try {
+            await Promise.all(
+                ids.map((id) => {
+                    const it = items.find((x) => x.id === id);
+                    const upd: Partial<ScheduleItem> = { scope: newScope };
+                    if (newScope === "day" && it && !it.date) upd.date = fallbackDate;
+                    return updateScheduleItem(id, upd);
+                })
+            );
+        } catch (e) {
+            console.error(e);
+            fetchData();
+        }
+    }
+
+    async function handleBulkDate(date: string) {
+        const ids = selectedIds;
+        if (ids.length === 0) return;
+        setItems((prev) => prev.map((i) => (ids.includes(i.id) ? { ...i, date } : i)));
+        clearSelection();
+        try {
+            await Promise.all(ids.map((id) => updateScheduleItem(id, { date })));
+        } catch (e) {
+            console.error(e);
+            fetchData();
+        }
+    }
 
     const changeAssignee = (id: string) => {
         setAssigneeFilter(id);
@@ -304,7 +379,7 @@ export default function SchedulePage() {
     const filterChips = [{ id: "all", label: t("schedule.all") }, ...members.map((m) => ({ id: m.id, label: m.nickname || m.name }))];
 
     return (
-        <div className="flex flex-col h-full bg-background text-foreground animate-in fade-in duration-500">
+        <div className="relative flex flex-col h-full bg-background text-foreground animate-in fade-in duration-500">
             <header className="px-6 pt-6 pb-2 border-b border-border bg-card/30">
                 <h1 className="text-2xl font-semibold tracking-tight">{t("schedule.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("schedule.subtitle")}</p>
@@ -433,6 +508,8 @@ export default function SchedulePage() {
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                     onReorder={handleReorder}
+                    selectedIds={selectedIds}
+                    onToggleSelect={toggleSelect}
                 />
             </div>
 
@@ -448,6 +525,60 @@ export default function SchedulePage() {
                         placeholder={t("schedule.notes_placeholder")}
                         className="mt-2 w-full min-h-[90px] rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-none"
                     />
+                </div>
+            )}
+
+            {/* Bulk actions bar */}
+            {selectedIds.length > 0 && (
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-popover border shadow-lg rounded-full px-5 py-2 flex items-center gap-3 z-30 animate-in slide-in-from-bottom-5">
+                    <span className="text-sm font-medium whitespace-nowrap">
+                        {selectedIds.length} {t("common.selected")}
+                    </span>
+                    <div className="h-4 w-px bg-border" />
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">{t("common.status")}</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center">
+                            <DropdownMenuItem onClick={() => handleBulkStatus("todo")}>{t("schedule.todo")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkStatus("doing")}>{t("schedule.doing")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleBulkStatus("done")}>{t("schedule.done")}</DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">{t("schedule.scope")}</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center">
+                            {SCOPES.map((s) => (
+                                <DropdownMenuItem key={s} onClick={() => handleBulkScope(s)}>
+                                    {t(`schedule.${s}`)}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <div className="flex items-center gap-1">
+                        <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                        <input
+                            type="date"
+                            title={t("schedule.date_label")}
+                            aria-label={t("schedule.date_label")}
+                            onChange={(e) => {
+                                if (e.target.value) handleBulkDate(e.target.value);
+                            }}
+                            className="h-7 rounded-md border border-input bg-transparent px-1 text-xs outline-none scheme-dark"
+                        />
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleBulkDate(todayInBrazil())}>
+                            {t("schedule.today")}
+                        </Button>
+                    </div>
+
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearSelection} aria-label={t("common.cancel")}>
+                        <X className="h-4 w-4" />
+                    </Button>
                 </div>
             )}
         </div>

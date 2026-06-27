@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useSortable } from "@dnd-kit/sortable";
+import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { useSortable, SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { ScheduleItem, ScheduleSubtask, TeamMember } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -36,13 +37,79 @@ interface ScheduleCardProps {
     members: TeamMember[];
     onUpdate: (id: string, updates: Partial<ScheduleItem>) => void;
     onDelete: (id: string) => void;
+    selected?: boolean;
+    onToggleSelect?: (id: string) => void;
+}
+
+function SubtaskRow({
+    sub,
+    onToggle,
+    onRemove,
+    onEditText,
+    removeLabel,
+    placeholder,
+}: {
+    sub: ScheduleSubtask;
+    onToggle: (id: string) => void;
+    onRemove: (id: string) => void;
+    onEditText: (id: string, text: string) => void;
+    removeLabel: string;
+    placeholder: string;
+}) {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
+    const style = { transform: CSS.Translate.toString(transform), transition };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn("flex items-center gap-1.5 group/sub", isDragging && "opacity-60")}
+        >
+            <button
+                type="button"
+                aria-label="Reorder"
+                {...listeners}
+                {...attributes}
+                className="cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground touch-none shrink-0"
+            >
+                <GripVertical className="h-3.5 w-3.5" />
+            </button>
+            <Checkbox checked={sub.done} onCheckedChange={() => onToggle(sub.id)} className="h-4 w-4 shrink-0" />
+            <input
+                defaultValue={sub.text}
+                onBlur={(e) => onEditText(sub.id, e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Escape") {
+                        (e.target as HTMLInputElement).value = sub.text;
+                        (e.target as HTMLInputElement).blur();
+                    }
+                }}
+                title={placeholder}
+                aria-label={placeholder}
+                className={cn(
+                    "text-sm flex-1 bg-transparent outline-none border-b border-transparent focus:border-input transition-colors",
+                    sub.done && "line-through text-muted-foreground"
+                )}
+            />
+            <button
+                type="button"
+                aria-label={removeLabel}
+                title={removeLabel}
+                onClick={() => onRemove(sub.id)}
+                className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-muted-foreground hover:text-red-500 shrink-0"
+            >
+                <X className="h-3.5 w-3.5" />
+            </button>
+        </div>
+    );
 }
 
 function memberInitial(name?: string) {
     return name?.trim()?.[0]?.toUpperCase() || "?";
 }
 
-export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCardProps) {
+export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onToggleSelect }: ScheduleCardProps) {
     const { t, language } = useLanguage();
     const [expanded, setExpanded] = useState(false);
     const [newSubtask, setNewSubtask] = useState("");
@@ -88,6 +155,17 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
         });
     };
 
+    const subtaskSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+
+    const handleSubtaskDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (!over || active.id === over.id) return;
+        const oldIndex = subtasks.findIndex((s) => s.id === active.id);
+        const newIndex = subtasks.findIndex((s) => s.id === over.id);
+        if (oldIndex < 0 || newIndex < 0) return;
+        onUpdate(item.id, { subtasks: arrayMove(subtasks, oldIndex, newIndex) });
+    };
+
     const addSubtask = () => {
         const text = newSubtask.trim();
         if (!text) return;
@@ -110,10 +188,22 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
             style={style}
             className={cn(
                 "group bg-card rounded-md border shadow-sm hover:border-primary/50 transition-colors relative",
-                isDragging && "opacity-50 ring-2 ring-primary"
+                isDragging && "opacity-50 ring-2 ring-primary",
+                selected && "border-primary ring-1 ring-primary"
             )}
         >
             <div className="flex items-center gap-2 p-3">
+                {onToggleSelect && (
+                    <Checkbox
+                        checked={selected}
+                        onCheckedChange={() => onToggleSelect(item.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className={cn(
+                            "h-4 w-4 shrink-0 transition-opacity",
+                            selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        )}
+                    />
+                )}
                 <button
                     {...listeners}
                     {...attributes}
@@ -233,41 +323,25 @@ export function ScheduleCard({ item, members, onUpdate, onDelete }: ScheduleCard
                         )}
                     </div>
 
-                    {subtasks.map((s) => (
-                        <div key={s.id} className="flex items-center gap-2 group/sub">
-                            <Checkbox
-                                checked={s.done}
-                                onCheckedChange={() => toggleSubtask(s.id)}
-                                className="h-4 w-4"
-                            />
-                            <input
-                                defaultValue={s.text}
-                                onBlur={(e) => updateSubtaskText(s.id, e.target.value)}
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                                    if (e.key === "Escape") {
-                                        (e.target as HTMLInputElement).value = s.text;
-                                        (e.target as HTMLInputElement).blur();
-                                    }
-                                }}
-                                title={t("schedule.subtask_placeholder")}
-                                aria-label={t("schedule.subtask_placeholder")}
-                                className={cn(
-                                    "text-sm flex-1 bg-transparent outline-none border-b border-transparent focus:border-input transition-colors",
-                                    s.done && "line-through text-muted-foreground"
-                                )}
-                            />
-                            <button
-                                type="button"
-                                aria-label={t("common.delete")}
-                                title={t("common.delete")}
-                                onClick={() => removeSubtask(s.id)}
-                                className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
-                            >
-                                <X className="h-3.5 w-3.5" />
-                            </button>
-                        </div>
-                    ))}
+                    <DndContext
+                        sensors={subtaskSensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleSubtaskDragEnd}
+                    >
+                        <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                            {subtasks.map((s) => (
+                                <SubtaskRow
+                                    key={s.id}
+                                    sub={s}
+                                    onToggle={toggleSubtask}
+                                    onRemove={removeSubtask}
+                                    onEditText={updateSubtaskText}
+                                    removeLabel={t("common.delete")}
+                                    placeholder={t("schedule.subtask_placeholder")}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
                     <div className="flex items-center gap-2">
                         <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                         <Input

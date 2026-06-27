@@ -32,6 +32,8 @@ interface ScheduleBoardProps {
     onUpdate: (id: string, updates: Partial<ScheduleItem>) => void;
     onDelete: (id: string) => void;
     onReorder: (updates: ScheduleReorderUpdate[]) => void;
+    selectedIds: string[];
+    onToggleSelect: (id: string) => void;
 }
 
 const COLUMNS: { id: ScheduleStatus; titleKey: string; dot: string }[] = [
@@ -53,6 +55,8 @@ function BoardColumn({
     onCreate,
     onUpdate,
     onDelete,
+    selectedIds,
+    onToggleSelect,
 }: {
     id: ScheduleStatus;
     title: string;
@@ -62,6 +66,8 @@ function BoardColumn({
     onCreate: (status: ScheduleStatus, title: string) => void;
     onUpdate: (id: string, updates: Partial<ScheduleItem>) => void;
     onDelete: (id: string) => void;
+    selectedIds: string[];
+    onToggleSelect: (id: string) => void;
 }) {
     const { t } = useLanguage();
     const { setNodeRef, isOver } = useDroppable({ id });
@@ -104,6 +110,8 @@ function BoardColumn({
                             members={members}
                             onUpdate={onUpdate}
                             onDelete={onDelete}
+                            selected={selectedIds.includes(item.id)}
+                            onToggleSelect={onToggleSelect}
                         />
                     ))}
                 </SortableContext>
@@ -139,7 +147,7 @@ function BoardColumn({
     );
 }
 
-export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onReorder }: ScheduleBoardProps) {
+export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onReorder, selectedIds, onToggleSelect }: ScheduleBoardProps) {
     const { t } = useLanguage();
     const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -220,6 +228,8 @@ export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, on
                         onCreate={onCreate}
                         onUpdate={onUpdate}
                         onDelete={onDelete}
+                        selectedIds={selectedIds}
+                        onToggleSelect={onToggleSelect}
                     />
                 ))}
             </div>
