@@ -87,6 +87,21 @@ function matchesDate(itemDate: string | null | undefined, scope: ScheduleScope, 
     return itemDate >= start && itemDate <= end;
 }
 
+// Day-scope items that are not done and whose date is in the past roll forward to today (Brazil)
+function applyRollover(list: ScheduleItem[]): { list: ScheduleItem[]; overdueIds: string[]; today: string } {
+    const today = todayInBrazil();
+    const overdueIds = list
+        .filter((i) => i.scope === "day" && i.status !== "done" && !!i.date && i.date < today)
+        .map((i) => i.id);
+    if (overdueIds.length === 0) return { list, overdueIds, today };
+    const set = new Set(overdueIds);
+    return {
+        list: list.map((i) => (set.has(i.id) ? { ...i, date: today } : i)),
+        overdueIds,
+        today,
+    };
+}
+
 export default function SchedulePage() {
     const { organization } = useAuth();
     const { t, language } = useLanguage();
@@ -103,6 +118,29 @@ export default function SchedulePage() {
 
     const [note, setNote] = useState("");
     const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const itemsRef = useRef<ScheduleItem[]>([]);
+
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
+    // Roll overdue, not-done day items forward to today (Brazil) when the tab refocuses / the day turns
+    useEffect(() => {
+        function checkRollover() {
+            const { list, overdueIds, today } = applyRollover(itemsRef.current);
+            if (overdueIds.length === 0) return;
+            setItems(list);
+            Promise.all(overdueIds.map((id) => updateScheduleItem(id, { date: today }))).catch((e) =>
+                console.error(e)
+            );
+        }
+        document.addEventListener("visibilitychange", checkRollover);
+        window.addEventListener("focus", checkRollover);
+        return () => {
+            document.removeEventListener("visibilitychange", checkRollover);
+            window.removeEventListener("focus", checkRollover);
+        };
+    }, []);
 
     // Restore persisted preferences
     useEffect(() => {
@@ -129,8 +167,14 @@ export default function SchedulePage() {
                 getScheduleItems(organization.id),
                 getMembers(organization.id),
             ]);
-            setItems(sData);
+            const { list, overdueIds, today } = applyRollover(sData);
+            setItems(list);
             setMembers(mData);
+            if (overdueIds.length > 0) {
+                Promise.all(overdueIds.map((id) => updateScheduleItem(id, { date: today }))).catch((e) =>
+                    console.error(e)
+                );
+            }
         } catch (error) {
             console.error(error);
             toast({ title: t("common.error"), description: t("schedule.load_error"), variant: "destructive" });
