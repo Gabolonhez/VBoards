@@ -19,6 +19,7 @@ import {
     getMembers,
 } from "@/lib/api";
 import { ScheduleItem, ScheduleScope, ScheduleStatus, TeamMember } from "@/types";
+import { autoStatus } from "@/lib/schedule";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
@@ -307,11 +308,27 @@ export default function SchedulePage() {
     }
 
     async function handleUpdate(id: string, updates: Partial<ScheduleItem>) {
+        // Checking the last subtask carries the card to Done (and reopening one carries it back). Done
+        // here rather than in the card so the target column's length is known and the card lands at its end.
+        let merged = updates;
+        const current = items.find((i) => i.id === id);
+        if (updates.subtasks !== undefined && current) {
+            const target = autoStatus(current, updates.subtasks);
+            if (target) {
+                merged = {
+                    ...updates,
+                    status: target,
+                    position: items.filter((i) => i.scope === current.scope && i.status === target && i.id !== id)
+                        .length,
+                };
+            }
+        }
+
         // Optimistic update (re-resolve assignee object if reassigned)
         setItems((prev) =>
             prev.map((i) => {
                 if (i.id !== id) return i;
-                const next = { ...i, ...updates };
+                const next = { ...i, ...merged };
                 if (updates.assigneeId !== undefined) {
                     next.assignee = members.find((m) => m.id === updates.assigneeId) || undefined;
                 }
@@ -319,7 +336,7 @@ export default function SchedulePage() {
             })
         );
         try {
-            await updateScheduleItem(id, updates);
+            await updateScheduleItem(id, merged);
         } catch (e) {
             console.error(e);
             toast({ title: t("common.error"), description: t("schedule.save_error"), variant: "destructive" });
