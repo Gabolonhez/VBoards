@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -8,7 +8,7 @@ import { ScheduleItem, ScheduleSubtask, TeamMember } from "@/types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn, todayInBrazil } from "@/lib/utils";
 import { useLanguage } from "@/context/language-context";
 import {
     DropdownMenu,
@@ -39,6 +39,8 @@ interface ScheduleCardProps {
     onDelete: (id: string) => void;
     selected?: boolean;
     onToggleSelect?: (id: string) => void;
+    /** Period currently in view; null when the date filter is off. Subtasks completed outside it collapse away. */
+    period?: { start: string; end: string } | null;
 }
 
 function SubtaskRow({
@@ -48,6 +50,7 @@ function SubtaskRow({
     onEditText,
     removeLabel,
     placeholder,
+    doneAtLabel,
 }: {
     sub: ScheduleSubtask;
     onToggle: (id: string) => void;
@@ -55,6 +58,7 @@ function SubtaskRow({
     onEditText: (id: string, text: string) => void;
     removeLabel: string;
     placeholder: string;
+    doneAtLabel?: string;
 }) {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
     const style = { transform: CSS.Translate.toString(transform), transition };
@@ -92,6 +96,9 @@ function SubtaskRow({
                     sub.done && "line-through text-muted-foreground"
                 )}
             />
+            {doneAtLabel && (
+                <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">{doneAtLabel}</span>
+            )}
             <button
                 type="button"
                 aria-label={removeLabel}
@@ -109,11 +116,12 @@ function memberInitial(name?: string) {
     return name?.trim()?.[0]?.toUpperCase() || "?";
 }
 
-export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onToggleSelect }: ScheduleCardProps) {
+export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onToggleSelect, period }: ScheduleCardProps) {
     const { t, language } = useLanguage();
-    const [expanded, setExpanded] = useState(false);
+    const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
     const [newSubtask, setNewSubtask] = useState("");
     const [titleDraft, setTitleDraft] = useState(item.title);
+    const [showOtherDays, setShowOtherDays] = useState(false);
 
     const saveTitle = () => {
         const value = titleDraft.trim();
@@ -137,8 +145,27 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
     const subtasks = item.subtasks || [];
     const doneCount = subtasks.filter((s) => s.done).length;
 
+    const completedInPeriod = (s: ScheduleSubtask) =>
+        !!period && !!s.doneAt && s.doneAt >= period.start && s.doneAt <= period.end;
+
+    // Under a period filter the card reads as "still open + what I closed in this period"; everything
+    // completed on another day (or before doneAt was tracked) collapses behind a toggle.
+    const otherDays = period ? subtasks.filter((s) => s.done && !completedInPeriod(s)) : [];
+    const periodDoneCount = period ? subtasks.filter(completedInPeriod).length : 0;
+    const rendered = period && !showOtherDays ? subtasks.filter((s) => !s.done || completedInPeriod(s)) : subtasks;
+
+    // A card closed work in the period being viewed? Open it, so the subtask is visible next to the
+    // project it belongs to instead of hiding behind a click. Manual toggling wins until the date moves.
+    const expanded = expandedOverride ?? periodDoneCount > 0;
+
+    useEffect(() => {
+        setExpandedOverride(null);
+    }, [period?.start, period?.end]);
+
     const toggleSubtask = (subId: string) => {
-        const next = subtasks.map((s) => (s.id === subId ? { ...s, done: !s.done } : s));
+        const next = subtasks.map((s) =>
+            s.id === subId ? { ...s, done: !s.done, doneAt: s.done ? null : todayInBrazil() } : s
+        );
         onUpdate(item.id, { subtasks: next });
     };
 
@@ -173,6 +200,7 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
             id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
             text,
             done: false,
+            doneAt: null,
         };
         onUpdate(item.id, { subtasks: [...subtasks, sub] });
         setNewSubtask("");
@@ -213,7 +241,7 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                 </button>
 
                 <button
-                    onClick={() => setExpanded((e) => !e)}
+                    onClick={() => setExpandedOverride(!expanded)}
                     className="flex flex-1 items-center gap-2 text-left min-w-0"
                 >
                     <ChevronRight
@@ -235,6 +263,15 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                 {subtasks.length > 0 && (
                     <span className="text-[11px] font-mono text-muted-foreground shrink-0">
                         {doneCount}/{subtasks.length}
+                    </span>
+                )}
+
+                {periodDoneCount > 0 && (
+                    <span
+                        title={t("schedule.done_in_period")}
+                        className="text-[11px] font-mono text-emerald-400 shrink-0"
+                    >
+                        +{periodDoneCount}
                     </span>
                 )}
 
@@ -328,8 +365,8 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                         collisionDetection={closestCenter}
                         onDragEnd={handleSubtaskDragEnd}
                     >
-                        <SortableContext items={subtasks.map((s) => s.id)} strategy={verticalListSortingStrategy}>
-                            {subtasks.map((s) => (
+                        <SortableContext items={rendered.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+                            {rendered.map((s) => (
                                 <SubtaskRow
                                     key={s.id}
                                     sub={s}
@@ -338,10 +375,24 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                                     onEditText={updateSubtaskText}
                                     removeLabel={t("common.delete")}
                                     placeholder={t("schedule.subtask_placeholder")}
+                                    doneAtLabel={s.done && s.doneAt ? formatDate(s.doneAt, language) : undefined}
                                 />
                             ))}
                         </SortableContext>
                     </DndContext>
+
+                    {otherDays.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setShowOtherDays((v) => !v)}
+                            className="text-[11px] text-muted-foreground/70 hover:text-foreground transition-colors"
+                        >
+                            {showOtherDays
+                                ? t("schedule.hide_other_days")
+                                : `${otherDays.length} ${t("schedule.done_other_days")}`}
+                        </button>
+                    )}
+
                     <div className="flex items-center gap-2">
                         <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                         <Input

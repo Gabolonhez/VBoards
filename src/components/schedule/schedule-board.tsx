@@ -34,6 +34,7 @@ interface ScheduleBoardProps {
     onReorder: (updates: ScheduleReorderUpdate[]) => void;
     selectedIds: string[];
     onToggleSelect: (id: string) => void;
+    period?: { start: string; end: string } | null;
 }
 
 const COLUMNS: { id: ScheduleStatus; titleKey: string; dot: string }[] = [
@@ -57,6 +58,7 @@ function BoardColumn({
     onDelete,
     selectedIds,
     onToggleSelect,
+    period,
 }: {
     id: ScheduleStatus;
     title: string;
@@ -68,6 +70,7 @@ function BoardColumn({
     onDelete: (id: string) => void;
     selectedIds: string[];
     onToggleSelect: (id: string) => void;
+    period?: { start: string; end: string } | null;
 }) {
     const { t } = useLanguage();
     const { setNodeRef, isOver } = useDroppable({ id });
@@ -112,6 +115,7 @@ function BoardColumn({
                             onDelete={onDelete}
                             selected={selectedIds.includes(item.id)}
                             onToggleSelect={onToggleSelect}
+                            period={period}
                         />
                     ))}
                 </SortableContext>
@@ -147,7 +151,7 @@ function BoardColumn({
     );
 }
 
-export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onReorder, selectedIds, onToggleSelect }: ScheduleBoardProps) {
+export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, onReorder, selectedIds, onToggleSelect, period }: ScheduleBoardProps) {
     const { t } = useLanguage();
     const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -230,6 +234,7 @@ export function ScheduleBoard({ items, members, onCreate, onUpdate, onDelete, on
                         onDelete={onDelete}
                         selectedIds={selectedIds}
                         onToggleSelect={onToggleSelect}
+                        period={period}
                     />
                 ))}
             </div>

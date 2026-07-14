@@ -97,6 +97,7 @@ export interface ScheduleSubtask {
   id: string;
   text: string;
   done: boolean;
+  doneAt?: string | null; // YYYY-MM-DD (Brazil tz); absent on subtasks completed before this was tracked
 }
 
 export interface ScheduleItem {

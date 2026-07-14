@@ -24,22 +24,12 @@ import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
 import { ScheduleBoard, ScheduleReorderUpdate } from "@/components/schedule/schedule-board";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn } from "@/lib/utils";
+import { cn, todayInBrazil } from "@/lib/utils";
 
 const SCOPES: ScheduleScope[] = ["month", "week", "day"];
 
 function memberInitial(name?: string) {
     return name?.trim()?.[0]?.toUpperCase() || "?";
-}
-
-// Today's date (YYYY-MM-DD) in Brazil timezone — 'en-CA' yields ISO-like format
-function todayInBrazil(): string {
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Sao_Paulo",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    }).format(new Date());
 }
 
 function toISO(dt: Date): string {
@@ -85,13 +75,22 @@ function fmtMonthYear(date: string, language: string): string {
     return new Date(y, m - 1, d).toLocaleDateString(localeOf(language), { month: "long", year: "numeric" });
 }
 
-// Does the item's date fall within the period defined by scope + anchor date?
-function matchesDate(itemDate: string | null | undefined, scope: ScheduleScope, anchor: string): boolean {
-    if (!itemDate) return false;
-    if (scope === "day") return itemDate === anchor;
-    if (scope === "month") return itemDate.slice(0, 7) === anchor.slice(0, 7);
-    const { start, end } = weekRange(anchor);
-    return itemDate >= start && itemDate <= end;
+// The inclusive date range covered by scope + anchor date
+function periodRange(scope: ScheduleScope, anchor: string): { start: string; end: string } {
+    if (scope === "day") return { start: anchor, end: anchor };
+    if (scope === "week") return weekRange(anchor);
+    const [y, m] = anchor.split("-").map(Number);
+    const lastDay = new Date(y, m, 0).getDate();
+    return { start: `${anchor.slice(0, 7)}-01`, end: `${anchor.slice(0, 7)}-${String(lastDay).padStart(2, "0")}` };
+}
+
+// Does the item belong in the period defined by scope + anchor date? An item's own date rolls forward
+// to today while it stays open, so it also matches any past period where it had a subtask completed —
+// otherwise navigating back a day would show nothing of what was actually done then.
+function matchesPeriod(item: ScheduleItem, scope: ScheduleScope, anchor: string): boolean {
+    const { start, end } = periodRange(scope, anchor);
+    if (item.date && item.date >= start && item.date <= end) return true;
+    return (item.subtasks || []).some((s) => s.doneAt && s.doneAt >= start && s.doneAt <= end);
 }
 
 // Day-scope items that are not done and whose date is in the past roll forward to today (Brazil)
@@ -282,10 +281,12 @@ export default function SchedulePage() {
         localStorage.setItem("vboards_schedule_assignee", id);
     };
 
+    const period = dateFilterActive ? periodRange(scope, selectedDate) : null;
+
     const visibleItems = items.filter((i) => {
         if (i.scope !== scope) return false;
         if (assigneeFilter !== "all" && i.assigneeId !== assigneeFilter) return false;
-        if (dateFilterActive && !matchesDate(i.date, scope, selectedDate)) return false;
+        if (dateFilterActive && !matchesPeriod(i, scope, selectedDate)) return false;
         return true;
     });
 
@@ -510,6 +511,7 @@ export default function SchedulePage() {
                     onReorder={handleReorder}
                     selectedIds={selectedIds}
                     onToggleSelect={toggleSelect}
+                    period={period}
                 />
             </div>
 
