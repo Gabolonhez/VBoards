@@ -19,7 +19,7 @@ import {
     getMembers,
 } from "@/lib/api";
 import { ScheduleItem, ScheduleScope, ScheduleStatus, TeamMember } from "@/types";
-import { autoStatus, buildDaySummary, formatDaySummary } from "@/lib/schedule";
+import { autoStatus, buildDaySummary, formatDaySummary, DaySummaryMode } from "@/lib/schedule";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
@@ -125,6 +125,7 @@ export default function SchedulePage() {
     const [dateFilterActive, setDateFilterActive] = useState(true);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [summaryOpen, setSummaryOpen] = useState(false);
+    const [summaryMode, setSummaryMode] = useState<DaySummaryMode>("done");
 
     const [note, setNote] = useState("");
     const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -160,6 +161,10 @@ export default function SchedulePage() {
         }
         const savedAssignee = localStorage.getItem("vboards_schedule_assignee");
         if (savedAssignee) setAssigneeFilter(savedAssignee);
+        const savedSummaryMode = localStorage.getItem("vboards_schedule_summary_mode");
+        if (savedSummaryMode === "done" || savedSummaryMode === "doing" || savedSummaryMode === "both") {
+            setSummaryMode(savedSummaryMode);
+        }
     }, []);
 
     useEffect(() => {
@@ -279,6 +284,11 @@ export default function SchedulePage() {
         }
     }
 
+    const changeSummaryMode = (mode: DaySummaryMode) => {
+        setSummaryMode(mode);
+        localStorage.setItem("vboards_schedule_summary_mode", mode);
+    };
+
     const changeAssignee = (id: string) => {
         setAssigneeFilter(id);
         localStorage.setItem("vboards_schedule_assignee", id);
@@ -296,7 +306,7 @@ export default function SchedulePage() {
     // Day summary spans every scope (month/week cards close subtasks too) but follows the person filter
     function daySummaryText(): string {
         const source = items.filter((i) => assigneeFilter === "all" || i.assigneeId === assigneeFilter);
-        const groups = buildDaySummary(source, selectedDate, t("schedule.summary_other"));
+        const groups = buildDaySummary(source, selectedDate, t("schedule.summary_other"), summaryMode);
         if (groups.length === 0) return "";
         const [y, m, d] = selectedDate.split("-").map(Number);
         const dateLabel = new Date(y, m - 1, d).toLocaleDateString(localeOf(language), {
@@ -306,7 +316,15 @@ export default function SchedulePage() {
         });
         const member = members.find((mb) => mb.id === assigneeFilter);
         const who = member ? ` — ${member.nickname || member.name}` : "";
-        return formatDaySummary(groups, `${t("schedule.summary_title")}${who} — ${dateLabel}`);
+        const doneLabel = t("schedule.summary_mode_done");
+        const doingLabel = t("schedule.summary_mode_doing");
+        // A single-kind summary says which kind in the header; "both" labels each project's sections instead
+        const kind = summaryMode === "done" ? ` — ${doneLabel}` : summaryMode === "doing" ? ` — ${doingLabel}` : "";
+        return formatDaySummary(
+            groups,
+            `${t("schedule.summary_title")}${who}${kind} — ${dateLabel}`,
+            summaryMode === "both" ? { done: doneLabel, doing: doingLabel } : null
+        );
     }
 
     async function handleCreate(status: ScheduleStatus, title: string) {
@@ -575,6 +593,8 @@ export default function SchedulePage() {
                 open={summaryOpen}
                 onOpenChange={setSummaryOpen}
                 summary={summaryOpen ? daySummaryText() : ""}
+                mode={summaryMode}
+                onModeChange={changeSummaryMode}
             />
 
             {/* Bulk actions bar */}

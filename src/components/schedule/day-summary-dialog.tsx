@@ -13,26 +13,56 @@ import {
 } from "@/components/ui/dialog";
 import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
+import { DaySummaryMode } from "@/lib/schedule";
+import { cn } from "@/lib/utils";
+
+const MODES: DaySummaryMode[] = ["done", "doing", "both"];
 
 interface DaySummaryDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** Generated summary; empty when nothing was completed that day */
+    /** Generated summary for the current mode; empty when there is nothing to report */
     summary: string;
+    mode: DaySummaryMode;
+    onModeChange: (mode: DaySummaryMode) => void;
 }
 
-export function DaySummaryDialog({ open, onOpenChange, summary }: DaySummaryDialogProps) {
+export function DaySummaryDialog({ open, onOpenChange, summary, mode, onModeChange }: DaySummaryDialogProps) {
+    const { t } = useLanguage();
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[560px]">
-                {/* Content unmounts on close, so each open starts from a freshly generated summary */}
-                <SummaryBody summary={summary} onClose={() => onOpenChange(false)} />
+                <DialogHeader>
+                    <DialogTitle>{t("schedule.summary_title")}</DialogTitle>
+                    <DialogDescription>{t("schedule.summary_description")}</DialogDescription>
+                </DialogHeader>
+
+                <div role="radiogroup" aria-label={t("schedule.summary_title")} className="flex gap-1 rounded-md bg-muted p-1 w-fit">
+                    {MODES.map((m) => (
+                        <button
+                            key={m}
+                            type="button"
+                            role="radio"
+                            aria-checked={mode === m}
+                            onClick={() => onModeChange(m)}
+                            className={cn(
+                                "px-3 py-1 rounded text-xs font-medium transition-colors",
+                                mode === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {t(`schedule.summary_mode_${m}`)}
+                        </button>
+                    ))}
+                </div>
+
+                {/* Content unmounts on close and remounts per mode, so edits never leak into a regenerated summary */}
+                <SummaryBody key={mode} summary={summary} mode={mode} onClose={() => onOpenChange(false)} />
             </DialogContent>
         </Dialog>
     );
 }
 
-function SummaryBody({ summary, onClose }: { summary: string; onClose: () => void }) {
+function SummaryBody({ summary, mode, onClose }: { summary: string; mode: DaySummaryMode; onClose: () => void }) {
     const { t } = useLanguage();
     const { toast } = useToast();
     const [text, setText] = useState(summary);
@@ -51,11 +81,6 @@ function SummaryBody({ summary, onClose }: { summary: string; onClose: () => voi
 
     return (
         <>
-            <DialogHeader>
-                <DialogTitle>{t("schedule.summary_title")}</DialogTitle>
-                <DialogDescription>{t("schedule.summary_description")}</DialogDescription>
-            </DialogHeader>
-
             {summary ? (
                 <textarea
                     value={text}
@@ -65,7 +90,7 @@ function SummaryBody({ summary, onClose }: { summary: string; onClose: () => voi
                     className="w-full min-h-[300px] max-h-[60vh] rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] resize-y"
                 />
             ) : (
-                <p className="text-sm text-muted-foreground py-8 text-center">{t("schedule.summary_empty")}</p>
+                <p className="text-sm text-muted-foreground py-8 text-center">{t(`schedule.summary_empty_${mode}`)}</p>
             )}
 
             <DialogFooter>

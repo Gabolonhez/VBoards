@@ -11,29 +11,53 @@ export function autoStatus(item: ScheduleItem, subtasks: ScheduleSubtask[]): Sch
     return null;
 }
 
-export interface DaySummaryGroup {
-    project: string;
-    entries: { text: string; assignee?: string }[];
+export type DaySummaryMode = "done" | "doing" | "both";
+
+interface DaySummaryEntry {
+    text: string;
+    assignee?: string;
 }
 
-// What got done on a given day, grouped by card — a card is the project, its subtasks the work. Subtasks
-// count by their own doneAt, so month/week cards contribute too. A day card with no subtasks has nothing
-// finer to report, so the card itself goes under the fallback group once it is Done on that day.
-export function buildDaySummary(items: ScheduleItem[], day: string, fallbackGroup: string): DaySummaryGroup[] {
+export interface DaySummaryGroup {
+    project: string;
+    done: DaySummaryEntry[];
+    doing: DaySummaryEntry[];
+}
+
+// What got done (and/or is still in progress) on a given day, grouped by card — a card is the project,
+// its subtasks the work. Done subtasks count by their own doneAt, so month/week cards contribute too. In
+// progress means a day card in the Doing column for that day: its open subtasks, or the card itself when
+// it has none. A day card with no subtasks has nothing finer to report, so it goes under the fallback group.
+export function buildDaySummary(
+    items: ScheduleItem[],
+    day: string,
+    fallbackGroup: string,
+    mode: DaySummaryMode
+): DaySummaryGroup[] {
     const groups = new Map<string, DaySummaryGroup>();
-    const add = (project: string, text: string, assignee?: string) => {
+    const add = (project: string, kind: "done" | "doing", text: string, assignee?: string) => {
         const key = project.trim().toLowerCase();
-        if (!groups.has(key)) groups.set(key, { project: project.trim(), entries: [] });
-        groups.get(key)!.entries.push({ text: text.trim(), assignee });
+        if (!groups.has(key)) groups.set(key, { project: project.trim(), done: [], doing: [] });
+        groups.get(key)![kind].push({ text: text.trim(), assignee });
     };
+    const wantDone = mode !== "doing";
+    const wantDoing = mode !== "done";
 
     for (const item of items) {
         const assignee = item.assignee ? item.assignee.nickname || item.assignee.name : undefined;
         const subtasks = item.subtasks || [];
+        const doingToday = item.scope === "day" && item.status === "doing" && item.date === day;
+
         if (subtasks.length > 0) {
-            subtasks.filter((s) => s.done && s.doneAt === day).forEach((s) => add(item.title, s.text, assignee));
-        } else if (item.scope === "day" && item.status === "done" && item.date === day) {
-            add(fallbackGroup, item.title, assignee);
+            if (wantDone) {
+                subtasks.filter((s) => s.done && s.doneAt === day).forEach((s) => add(item.title, "done", s.text, assignee));
+            }
+            if (wantDoing && doingToday) {
+                subtasks.filter((s) => !s.done).forEach((s) => add(item.title, "doing", s.text, assignee));
+            }
+        } else if (item.scope === "day" && item.date === day) {
+            if (wantDone && item.status === "done") add(fallbackGroup, "done", item.title, assignee);
+            if (wantDoing && item.status === "doing") add(fallbackGroup, "doing", item.title, assignee);
         }
     }
 
@@ -44,14 +68,27 @@ export function buildDaySummary(items: ScheduleItem[], day: string, fallbackGrou
         .map(([, g]) => g);
 }
 
-// Plain text ready to paste in WhatsApp / Slack (both read *x* as bold). Names are only tagged when the
-// summary mixes more than one person — a personal summary doesn't need them.
-export function formatDaySummary(groups: DaySummaryGroup[], header: string): string {
-    const people = new Set(groups.flatMap((g) => g.entries.map((e) => e.assignee).filter(Boolean)));
+// Plain text ready to paste in WhatsApp / Slack (both read *x* as bold, _x_ as italic). Names are only
+// tagged when the summary mixes more than one person — a personal summary doesn't need them. Done / in
+// progress sub-headings are passed only when both were asked for, so a project with one kind still reads right.
+export function formatDaySummary(
+    groups: DaySummaryGroup[],
+    header: string,
+    labels: { done: string; doing: string } | null
+): string {
+    const people = new Set(
+        groups.flatMap((g) => [...g.done, ...g.doing].map((e) => e.assignee).filter(Boolean))
+    );
     const tagNames = people.size > 1;
+    const bullets = (entries: DaySummaryEntry[]) =>
+        entries.map((e) => `• ${e.text}${tagNames && e.assignee ? ` (${e.assignee})` : ""}`);
+
     const blocks = groups.map((g) => {
-        const lines = g.entries.map((e) => `• ${e.text}${tagNames && e.assignee ? ` (${e.assignee})` : ""}`);
-        return [`*${g.project}*`, ...lines].join("\n");
+        if (!labels) return [`*${g.project}*`, ...bullets([...g.done, ...g.doing])].join("\n");
+        const lines = [`*${g.project}*`];
+        if (g.done.length > 0) lines.push(`_${labels.done}_`, ...bullets(g.done));
+        if (g.doing.length > 0) lines.push(`_${labels.doing}_`, ...bullets(g.doing));
+        return lines.join("\n");
     });
     return [`*${header}*`, ...blocks].join("\n\n");
 }
