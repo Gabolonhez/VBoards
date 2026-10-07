@@ -145,6 +145,14 @@ export const translations = {
             item_updated: "Item updated",
             item_deleted: "Item deleted",
             load_error: "Failed to load schedule",
+            summary_button: "Day summary",
+            summary_title: "Day summary",
+            summary_description: "What was completed on this day, grouped by project. Edit if needed and copy to send to the team.",
+            summary_empty: "Nothing was completed on this day yet.",
+            summary_other: "Other",
+            summary_copy: "Copy",
+            summary_copied: "Copied",
+            summary_copy_error: "Could not copy to clipboard",
             save_error: "Failed to save"
         },
         apps: {
@@ -433,6 +441,14 @@ export const translations = {
             item_updated: "Item atualizado",
             item_deleted: "Item excluído",
             load_error: "Falha ao carregar o planejamento",
+            summary_button: "Resumo do dia",
+            summary_title: "Resumo do dia",
+            summary_description: "O que foi concluído neste dia, separado por projeto. Edite se precisar e copie para mandar à equipe.",
+            summary_empty: "Nada foi concluído neste dia ainda.",
+            summary_other: "Outros",
+            summary_copy: "Copiar",
+            summary_copied: "Copiado",
+            summary_copy_error: "Não foi possível copiar",
             save_error: "Falha ao salvar"
         },
         apps: {
@@ -722,6 +738,14 @@ export const translations = {
             item_updated: "Elemento actualizado",
             item_deleted: "Elemento eliminado",
             load_error: "Error al cargar la planificación",
+            summary_button: "Resumen del día",
+            summary_title: "Resumen del día",
+            summary_description: "Lo que se completó este día, agrupado por proyecto. Edítalo si hace falta y cópialo para enviarlo al equipo.",
+            summary_empty: "Todavía no se completó nada este día.",
+            summary_other: "Otros",
+            summary_copy: "Copiar",
+            summary_copied: "Copiado",
+            summary_copy_error: "No se pudo copiar",
             save_error: "Error al guardar"
         },
         apps: {

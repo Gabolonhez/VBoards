@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, ChevronLeft, ChevronRight, CalendarDays, X } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CalendarDays, X, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     DropdownMenu,
@@ -19,11 +19,12 @@ import {
     getMembers,
 } from "@/lib/api";
 import { ScheduleItem, ScheduleScope, ScheduleStatus, TeamMember } from "@/types";
-import { autoStatus } from "@/lib/schedule";
+import { autoStatus, buildDaySummary, formatDaySummary } from "@/lib/schedule";
 import { useAuth } from "@/context/auth-context";
 import { useLanguage } from "@/context/language-context";
 import { useToast } from "@/hooks/use-toast";
 import { ScheduleBoard, ScheduleReorderUpdate } from "@/components/schedule/schedule-board";
+import { DaySummaryDialog } from "@/components/schedule/day-summary-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, todayInBrazil } from "@/lib/utils";
 
@@ -123,6 +124,7 @@ export default function SchedulePage() {
     const [selectedDate, setSelectedDate] = useState<string>(() => todayInBrazil());
     const [dateFilterActive, setDateFilterActive] = useState(true);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
+    const [summaryOpen, setSummaryOpen] = useState(false);
 
     const [note, setNote] = useState("");
     const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,6 +292,22 @@ export default function SchedulePage() {
         if (dateFilterActive && !matchesPeriod(i, scope, selectedDate)) return false;
         return true;
     });
+
+    // Day summary spans every scope (month/week cards close subtasks too) but follows the person filter
+    function daySummaryText(): string {
+        const source = items.filter((i) => assigneeFilter === "all" || i.assigneeId === assigneeFilter);
+        const groups = buildDaySummary(source, selectedDate, t("schedule.summary_other"));
+        if (groups.length === 0) return "";
+        const [y, m, d] = selectedDate.split("-").map(Number);
+        const dateLabel = new Date(y, m - 1, d).toLocaleDateString(localeOf(language), {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+        });
+        const member = members.find((mb) => mb.id === assigneeFilter);
+        const who = member ? ` — ${member.nickname || member.name}` : "";
+        return formatDaySummary(groups, `${t("schedule.summary_title")}${who} — ${dateLabel}`);
+    }
 
     async function handleCreate(status: ScheduleStatus, title: string) {
         if (!organization) return;
@@ -514,6 +532,12 @@ export default function SchedulePage() {
                         >
                             {t("schedule.all_dates")}
                         </button>
+                        {scope === "day" && (
+                            <Button variant="outline" size="sm" className="ml-2 h-8" onClick={() => setSummaryOpen(true)}>
+                                <ClipboardList className="h-3.5 w-3.5" />
+                                {t("schedule.summary_button")}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </header>
@@ -546,6 +570,12 @@ export default function SchedulePage() {
                     />
                 </div>
             )}
+
+            <DaySummaryDialog
+                open={summaryOpen}
+                onOpenChange={setSummaryOpen}
+                summary={summaryOpen ? daySummaryText() : ""}
+            />
 
             {/* Bulk actions bar */}
             {selectedIds.length > 0 && (
