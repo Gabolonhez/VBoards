@@ -4,6 +4,8 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useEffect, useState } from "react";
 import {
     User,
     Bell,
@@ -14,9 +16,37 @@ import {
     ChevronRight,
 } from "lucide-react";
 import { useLanguage } from "@/context/language-context";
+import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
+import { getMembers, updateMember } from "@/lib/api";
 
 export default function SettingsPage() {
     const { t } = useLanguage();
+    const { user, organization } = useAuth();
+    const { toast } = useToast();
+    // The logged-in user's own team member row in the current organization (matched by user_id)
+    const [me, setMe] = useState<{ id: string; commitLog: boolean } | null>(null);
+
+    useEffect(() => {
+        if (!user || !organization) return;
+        getMembers(organization.id)
+            .then((ms) => {
+                const m = ms.find((x) => x.userId === user.id);
+                setMe(m ? { id: m.id, commitLog: m.commitLog !== false } : null);
+            })
+            .catch(console.error);
+    }, [user, organization]);
+
+    const toggleCommitLog = async (value: boolean) => {
+        if (!me) return;
+        setMe({ ...me, commitLog: value });
+        try {
+            await updateMember(me.id, { commitLog: value });
+        } catch {
+            setMe({ ...me, commitLog: !value });
+            toast({ title: t('settings.commit_log_error'), variant: "destructive" });
+        }
+    };
 
     const settingsSections = [
         {
@@ -102,6 +132,20 @@ export default function SettingsPage() {
                             </div>
                         ))}
                     </div>
+
+                    {me && (
+                        <label className="mt-6 flex items-start gap-3 p-4 bg-card rounded-xl border border-border cursor-pointer">
+                            <Checkbox
+                                className="mt-0.5"
+                                checked={me.commitLog}
+                                onCheckedChange={(v) => toggleCommitLog(v === true)}
+                            />
+                            <div>
+                                <h3 className="text-sm font-medium text-foreground">{t('settings.commit_log')}</h3>
+                                <p className="text-xs text-muted-foreground mt-0.5">{t('settings.commit_log_desc')}</p>
+                            </div>
+                        </label>
+                    )}
 
                     {/* Danger Zone */}
                     <div className="mt-6 bg-card rounded-xl border border-destructive/30 overflow-hidden">

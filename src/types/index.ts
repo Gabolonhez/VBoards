@@ -39,6 +39,7 @@ export interface TeamMember {
   userId?: string;
   email?: string;
   invitationId?: string;
+  commitLog?: boolean; // mapped from commit_log
 }
 
 export interface Project {

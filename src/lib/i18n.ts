@@ -227,6 +227,9 @@ export const translations = {
             danger_zone: "Danger Zone",
             danger_desc: "Irreversible and destructive actions",
             delete_account: "Delete Account",
+            commit_log: "Log my git commits to Planning automatically",
+            commit_log_desc: "Adds each commit as a done subtask on the matching day card",
+            commit_log_error: "Could not save",
             rights: "All rights reserved.",
             badges: {
                 dark: "Dark",
@@ -529,6 +532,9 @@ export const translations = {
             danger_zone: "Zona de Perigo",
             danger_desc: "Ações irreversíveis e destrutivas",
             delete_account: "Excluir Conta",
+            commit_log: "Registrar meus commits do git no Planejamento automaticamente",
+            commit_log_desc: "Adiciona cada commit como subtarefa concluída no card do dia correspondente",
+            commit_log_error: "Não foi possível salvar",
             rights: "Todos os direitos reservados.",
             badges: {
                 dark: "Escuro",
@@ -830,6 +836,9 @@ export const translations = {
             danger_zone: "Zona de Peligro",
             danger_desc: "Acciones irreversibles y destructivas",
             delete_account: "Eliminar Cuenta",
+            commit_log: "Registrar mis commits de git en Planificación automáticamente",
+            commit_log_desc: "Añade cada commit como subtarea completada en la tarjeta del día correspondiente",
+            commit_log_error: "No se pudo guardar",
             rights: "Todos los derechos reservados.",
             badges: {
                 dark: "Oscuro",

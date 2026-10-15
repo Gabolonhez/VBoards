@@ -271,7 +271,8 @@ export async function getMembers(organizationId?: string): Promise<TeamMember[]>
         createdAt: m.created_at,
         userId: m.user_id,
         email: m.email,
-        invitationId: m.invitation_id
+        invitationId: m.invitation_id,
+        commitLog: m.commit_log
     }));
 }
 
@@ -299,6 +300,11 @@ export async function updateMember(id: string, updates: Partial<TeamMember>): Pr
     if (updates.avatarUrl !== undefined) {
         dbUpdates.avatar_url = updates.avatarUrl;
         delete dbUpdates.avatarUrl;
+    }
+
+    if (updates.commitLog !== undefined) {
+        dbUpdates.commit_log = updates.commitLog;
+        delete dbUpdates.commitLog;
     }
 
     // Remove fields that shouldn't be updated directly or are read-only

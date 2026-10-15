@@ -30,23 +30,25 @@ export async function POST(req: Request) {
     // The committer must be a team member; their organizations bound which cards the hook may touch
     const { data: members, error: membersError } = await supabase
         .from("team_members")
-        .select("id, organization_id")
+        .select("id, organization_id, commit_log")
         .ilike("email", email);
     if (membersError) return NextResponse.json({ error: membersError.message }, { status: 500 });
     if (!members?.length) return NextResponse.json({ skipped: "committer is not a team member" });
+    const enabled = members.filter((m) => m.commit_log);
+    if (!enabled.length) return NextResponse.json({ skipped: "commit log is off" });
 
     const today = todayInBrazil();
     const { data: cards, error: cardsError } = await supabase
         .from("schedule_items")
         .select("*")
         .eq("scope", "day")
-        .in("organization_id", members.map((m) => m.organization_id))
+        .in("organization_id", enabled.map((m) => m.organization_id))
         .lte("date", today);
     if (cardsError) return NextResponse.json({ error: cardsError.message }, { status: 500 });
 
     // Today's card, or an overdue open one (the Planning page rolls those forward to today anyway).
     // Prefer the committer's own card, then the most recent date.
-    const memberIds = new Set(members.map((m) => m.id));
+    const memberIds = new Set(enabled.map((m) => m.id));
     const score = (c: { assignee_id: string | null; date: string }) => (memberIds.has(c.assignee_id) ? 2 : 0) + (c.date === today ? 1 : 0);
     const card = (cards ?? [])
         .filter((c) => norm(c.title) === norm(repo) && (c.date === today || c.status !== "done"))
