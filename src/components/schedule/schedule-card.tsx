@@ -18,7 +18,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, GripVertical, Trash, Plus, X, Check, CalendarDays } from "lucide-react";
+import { ChevronRight, GripVertical, Trash, Plus, X, Check, CalendarDays, Bot, Loader2 } from "lucide-react";
+import { useAuth } from "@/context/auth-context";
 
 const LOCALE_MAP: Record<string, string> = { pt: "pt-BR", es: "es-ES", en: "en-US" };
 
@@ -51,6 +52,8 @@ function SubtaskRow({
     removeLabel,
     placeholder,
     doneAtLabel,
+    labels,
+    onAgent,
 }: {
     sub: ScheduleSubtask;
     onToggle: (id: string) => void;
@@ -59,7 +62,12 @@ function SubtaskRow({
     removeLabel: string;
     placeholder: string;
     doneAtLabel?: string;
+    labels: Record<"send" | "queued" | "running" | "failed" | "done" | "cancel", string>;
+    /** true = queue it for the agent as the current user; false = clear the handoff */
+    onAgent: (id: string, queue: boolean) => void;
 }) {
+    const [openSummary, setOpenSummary] = useState(false);
+    const agent = sub.agent;
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: sub.id });
     const style = { transform: CSS.Translate.toString(transform), transition };
 
@@ -67,8 +75,9 @@ function SubtaskRow({
         <div
             ref={setNodeRef}
             style={style}
-            className={cn("flex items-center gap-1.5 group/sub", isDragging && "opacity-60")}
+            className={cn("group/sub", isDragging && "opacity-60")}
         >
+            <div className="flex items-center gap-1.5">
             <button
                 type="button"
                 aria-label="Reorder"
@@ -96,6 +105,39 @@ function SubtaskRow({
                     sub.done && "line-through text-muted-foreground"
                 )}
             />
+            {agent && (
+                <span
+                    className={cn(
+                        "flex items-center gap-1 text-[10px] shrink-0 rounded px-1.5 py-0.5 bg-muted/60",
+                        agent.status === "failed" ? "text-red-500" : agent.status === "done" ? "text-emerald-400" : "text-muted-foreground"
+                    )}
+                >
+                    {agent.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+                    {labels[agent.status]}
+                    {agent.status === "queued" && (
+                        <button
+                            type="button"
+                            aria-label={labels.cancel}
+                            title={labels.cancel}
+                            onClick={() => onAgent(sub.id, false)}
+                            className="hover:text-red-500"
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    )}
+                </span>
+            )}
+            {!sub.done && (!agent || agent.status === "done" || agent.status === "failed") && (
+                <button
+                    type="button"
+                    aria-label={labels.send}
+                    title={labels.send}
+                    onClick={() => onAgent(sub.id, true)}
+                    className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-muted-foreground hover:text-primary shrink-0"
+                >
+                    <Bot className="h-3.5 w-3.5" />
+                </button>
+            )}
             {doneAtLabel && (
                 <span className="text-[10px] text-muted-foreground/70 tabular-nums shrink-0">{doneAtLabel}</span>
             )}
@@ -108,6 +150,18 @@ function SubtaskRow({
             >
                 <X className="h-3.5 w-3.5" />
             </button>
+            </div>
+            {agent?.summary && (
+                <p
+                    onClick={() => setOpenSummary((v) => !v)}
+                    className={cn(
+                        "ml-12 mt-0.5 text-xs text-muted-foreground cursor-pointer whitespace-pre-wrap",
+                        !openSummary && "line-clamp-2"
+                    )}
+                >
+                    {agent.summary}
+                </p>
+            )}
         </div>
     );
 }
@@ -118,6 +172,7 @@ function memberInitial(name?: string) {
 
 export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onToggleSelect, period }: ScheduleCardProps) {
     const { t, language } = useLanguage();
+    const { user } = useAuth();
     const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
     const [newSubtask, setNewSubtask] = useState("");
     const [titleDraft, setTitleDraft] = useState(item.title);
@@ -171,6 +226,18 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
 
     const removeSubtask = (subId: string) => {
         onUpdate(item.id, { subtasks: subtasks.filter((s) => s.id !== subId) });
+    };
+
+    const setSubtaskAgent = (subId: string, queue: boolean) => {
+        const me = members.find((m) => m.userId === user?.id);
+        if (queue && !me) return;
+        onUpdate(item.id, {
+            subtasks: subtasks.map((s) => {
+                if (s.id !== subId) return s;
+                const agent = queue ? { status: "queued" as const, requestedBy: me!.id, updatedAt: new Date().toISOString() } : undefined;
+                return { ...s, agent };
+            }),
+        });
     };
 
     const updateSubtaskText = (subId: string, text: string) => {
@@ -376,6 +443,15 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                                     removeLabel={t("common.delete")}
                                     placeholder={t("schedule.subtask_placeholder")}
                                     doneAtLabel={s.done && s.doneAt ? formatDate(s.doneAt, language) : undefined}
+                                    labels={{
+                                        send: t("schedule.agent_send"),
+                                        queued: t("schedule.agent_queued"),
+                                        running: t("schedule.agent_running"),
+                                        failed: t("schedule.agent_failed"),
+                                        done: t("schedule.agent_done"),
+                                        cancel: t("schedule.agent_cancel"),
+                                    }}
+                                    onAgent={setSubtaskAgent}
                                 />
                             ))}
                         </SortableContext>

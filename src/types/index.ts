@@ -99,6 +99,8 @@ export interface ScheduleSubtask {
   text: string;
   done: boolean;
   doneAt?: string | null; // YYYY-MM-DD (Brazil tz); absent on subtasks completed before this was tracked
+  agent?: { status: 'queued' | 'running' | 'done' | 'failed'; requestedBy: string; summary?: string; updatedAt?: string }; // handed to a coding agent (AgenticOffice)
+  source?: 'agent'; // created from an agent's todo list
 }
 
 export interface ScheduleItem {

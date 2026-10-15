@@ -83,6 +83,6 @@ export const config = {
          * Feel free to modify this pattern to include more paths.
          */
         // api/commits is called by the git hook with its own secret, not a user session
-        '/((?!_next/static|_next/image|favicon.ico|api/commits|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        '/((?!_next/static|_next/image|favicon.ico|api/commits|api/agent-tasks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
