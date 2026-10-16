@@ -82,7 +82,7 @@ export const config = {
          * - favicon.ico (favicon file)
          * Feel free to modify this pattern to include more paths.
          */
-        // api/commits is called by the git hook with its own secret, not a user session
-        '/((?!_next/static|_next/image|favicon.ico|api/commits|api/agent-tasks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        // api/agent-tasks is called by AgenticOffice with its own secret, not a user session
+        '/((?!_next/static|_next/image|favicon.ico|api/agent-tasks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }
