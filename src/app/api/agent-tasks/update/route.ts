@@ -4,7 +4,7 @@ import { todayInBrazil } from "@/lib/utils";
 import { ScheduleItem, ScheduleSubtask } from "@/types";
 import { checkAuth, serviceClient, findMembers } from "@/lib/server/integration";
 
-const STATUSES = ["running", "done", "failed"] as const;
+const STATUSES = ["running", "review", "done", "failed"] as const;
 
 export async function POST(req: Request) {
     const denied = checkAuth(req);
@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
     const { cardId, subtaskId, status } = body ?? {};
     if (!email || typeof cardId !== "string" || !cardId || typeof subtaskId !== "string" || !subtaskId || !STATUSES.includes(status)) {
-        return NextResponse.json({ error: "email, cardId, subtaskId and status (running|done|failed) are required" }, { status: 400 });
+        return NextResponse.json({ error: "email, cardId, subtaskId and status (running|review|done|failed) are required" }, { status: 400 });
     }
     if (body.summary !== undefined && typeof body.summary !== "string") {
         return NextResponse.json({ error: "summary must be a string" }, { status: 400 });

@@ -62,7 +62,7 @@ function SubtaskRow({
     removeLabel: string;
     placeholder: string;
     doneAtLabel?: string;
-    labels: Record<"send" | "queued" | "running" | "failed" | "done" | "cancel", string>;
+    labels: Record<"send" | "queued" | "running" | "review" | "failed" | "done" | "cancel", string>;
     /** true = queue it for the agent as the current user; false = clear the handoff */
     onAgent: (id: string, queue: boolean) => void;
 }) {
@@ -109,7 +109,7 @@ function SubtaskRow({
                 <span
                     className={cn(
                         "flex items-center gap-1 text-[10px] shrink-0 rounded px-1.5 py-0.5 bg-muted/60",
-                        agent.status === "failed" ? "text-red-500" : agent.status === "done" ? "text-emerald-400" : "text-muted-foreground"
+                        agent.status === "failed" ? "text-red-500" : agent.status === "review" ? "text-amber-500" : agent.status === "done" ? "text-emerald-400" : "text-muted-foreground"
                     )}
                 >
                     {agent.status === "running" ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
@@ -127,7 +127,7 @@ function SubtaskRow({
                     )}
                 </span>
             )}
-            {!sub.done && (!agent || agent.status === "done" || agent.status === "failed") && (
+            {!sub.done && (!agent || agent.status === "done" || agent.status === "failed" || agent.status === "review") && (
                 <button
                     type="button"
                     aria-label={labels.send}
@@ -447,6 +447,7 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                                         send: t("schedule.agent_send"),
                                         queued: t("schedule.agent_queued"),
                                         running: t("schedule.agent_running"),
+                                        review: t("schedule.agent_review"),
                                         failed: t("schedule.agent_failed"),
                                         done: t("schedule.agent_done"),
                                         cancel: t("schedule.agent_cancel"),
