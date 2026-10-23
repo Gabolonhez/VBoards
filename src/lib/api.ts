@@ -457,6 +457,7 @@ function mapScheduleItem(s: any): ScheduleItem {
         assigneeId: s.assignee_id,
         assignee: s.assignee ? { ...s.assignee, avatarUrl: s.assignee.avatar_url, createdAt: s.assignee.created_at } : undefined,
         subtasks: Array.isArray(s.subtasks) ? s.subtasks : [],
+        refine: s.refine ?? null,
         position: s.position ?? 0,
         createdAt: s.created_at
     };
@@ -498,6 +499,7 @@ export async function updateScheduleItem(id: string, updates: Partial<ScheduleIt
     if (updates.date !== undefined) dbUpdates.date = updates.date || null;
     if (updates.assigneeId !== undefined) dbUpdates.assignee_id = updates.assigneeId || null;
     if (updates.subtasks !== undefined) dbUpdates.subtasks = updates.subtasks;
+    if (updates.refine !== undefined) dbUpdates.refine = updates.refine ?? null;
     if (updates.position !== undefined) dbUpdates.position = updates.position;
 
     const { error } = await supabase.from("schedule_items").update(dbUpdates).eq("id", id);

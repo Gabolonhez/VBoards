@@ -103,6 +103,16 @@ export interface ScheduleSubtask {
   source?: 'agent'; // created from an agent's todo list
 }
 
+export interface ScheduleRefine {
+  status: 'queued' | 'running' | 'ready' | 'failed';
+  requestedBy: string; // team_member id
+  plan?: string;
+  questions?: string[];
+  subtaskIds?: string[]; // subtasks proposed by the agent
+  error?: string;
+  updatedAt: string;
+}
+
 export interface ScheduleItem {
   id: string;
   organizationId?: string;
@@ -114,6 +124,7 @@ export interface ScheduleItem {
   assigneeId?: string | null;
   assignee?: TeamMember;
   subtasks?: ScheduleSubtask[];
+  refine?: ScheduleRefine | null; // "refine with agent" request/result (AgenticOffice)
   position?: number;
   createdAt?: string;
 }

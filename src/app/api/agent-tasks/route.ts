@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ScheduleSubtask } from "@/types";
+import { pendingRefines } from "@/lib/server/refine";
 import { checkAuth, serviceClient, findMembers } from "@/lib/server/integration";
 
 // AgenticOffice polls this for the subtasks the given user queued for an agent.
@@ -13,12 +14,12 @@ export async function GET(req: Request) {
     const supabase = serviceClient();
     const { members, error: membersError } = await findMembers(supabase, email);
     if (membersError) return NextResponse.json({ error: membersError }, { status: 500 });
-    if (!members.length) return NextResponse.json({ tasks: [] });
+    if (!members.length) return NextResponse.json({ tasks: [], refines: [] });
     const ids = new Set(members.map((m) => m.id));
 
     const { data: cards, error } = await supabase
         .from("schedule_items")
-        .select("id, title, date, subtasks")
+        .select("id, title, description, date, subtasks, refine")
         .in("organization_id", members.map((m) => m.organization_id));
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -27,5 +28,5 @@ export async function GET(req: Request) {
             .filter((s) => s.agent?.status === "queued" && ids.has(s.agent.requestedBy))
             .map((s) => ({ cardId: c.id, subtaskId: s.id, text: s.text, cardTitle: c.title, date: c.date }))
     );
-    return NextResponse.json({ tasks });
+    return NextResponse.json({ tasks, refines: pendingRefines(cards ?? [], ids) });
 }

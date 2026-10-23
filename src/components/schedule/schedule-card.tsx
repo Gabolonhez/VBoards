@@ -18,7 +18,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronRight, GripVertical, Trash, Plus, X, Check, CalendarDays, Bot, Loader2 } from "lucide-react";
+import { ChevronRight, GripVertical, Trash, Plus, X, Check, CalendarDays, Bot, Loader2, Sparkles } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
 const LOCALE_MAP: Record<string, string> = { pt: "pt-BR", es: "es-ES", en: "en-US" };
@@ -240,6 +240,24 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
         });
     };
 
+    const me = members.find((m) => m.userId === user?.id);
+    const refine = item.refine;
+    const requestRefine = () => {
+        if (!me) return;
+        onUpdate(item.id, { refine: { status: "queued", requestedBy: me.id, updatedAt: new Date().toISOString() } });
+    };
+    const approveRefine = () => {
+        if (!me || !refine) return;
+        const ids = new Set(refine.subtaskIds ?? []);
+        const now = new Date().toISOString();
+        onUpdate(item.id, {
+            subtasks: subtasks.map((s) =>
+                ids.has(s.id) && !s.done && !s.agent ? { ...s, agent: { status: "queued" as const, requestedBy: me.id, updatedAt: now } } : s
+            ),
+            refine: null,
+        });
+    };
+
     const updateSubtaskText = (subId: string, text: string) => {
         const value = text.trim();
         const current = subtasks.find((s) => s.id === subId);
@@ -426,6 +444,54 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
                             </button>
                         )}
                     </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {(!refine || refine.status === "failed") && (
+                            <button
+                                type="button"
+                                onClick={requestRefine}
+                                disabled={!me}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+                            >
+                                <Sparkles className="h-3.5 w-3.5" />
+                                {t("schedule.refine")}
+                            </button>
+                        )}
+                        {refine && (refine.status === "queued" || refine.status === "running") && (
+                            <span className="flex items-center gap-1 text-[11px] text-muted-foreground rounded px-1.5 py-0.5 bg-muted/60">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                {t("schedule.refine_running")}
+                            </span>
+                        )}
+                        {refine?.status === "failed" && (
+                            <span className="text-[11px] text-red-500">{refine.error || t("schedule.refine_failed")}</span>
+                        )}
+                    </div>
+
+                    {refine?.status === "ready" && (
+                        <div className="rounded-md border border-primary/30 bg-primary/5 p-2 space-y-1.5 text-xs">
+                            <div className="font-medium text-primary">{t("schedule.refine_ready")}</div>
+                            {refine.plan && <p className="whitespace-pre-wrap text-muted-foreground">{refine.plan}</p>}
+                            {!!refine.questions?.length && (
+                                <div>
+                                    <div className="font-medium">{t("schedule.refine_questions")}</div>
+                                    <ul className="list-disc pl-4 text-muted-foreground whitespace-pre-wrap">
+                                        {refine.questions.map((q, i) => (
+                                            <li key={i}>{q}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-3 pt-1">
+                                <button type="button" onClick={approveRefine} disabled={!me} className="font-medium text-primary hover:underline disabled:opacity-50">
+                                    {t("schedule.refine_approve")}
+                                </button>
+                                <button type="button" onClick={requestRefine} disabled={!me} className="text-muted-foreground hover:text-foreground disabled:opacity-50">
+                                    {t("schedule.refine_again")}
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <DndContext
                         sensors={subtaskSensors}
