@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { ProjectProvider } from "@/context/project-context";
 import { LanguageProvider } from "@/context/language-context";
 import { AuthProvider } from "@/context/auth-context";
+import { PendingInvitations } from "@/components/layout/pending-invitations";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -31,6 +32,7 @@ export default function RootLayout({
             <ProjectProvider>
               <Sidebar />
               <main className="flex-1 overflow-auto bg-background">
+                <PendingInvitations />
                 {children}
               </main>
               <Toaster />

@@ -19,6 +19,7 @@ import { useLanguage } from "@/context/language-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { getMembers, updateMember } from "@/lib/api";
+import { ApiTokens } from "@/components/settings/api-tokens";
 
 export default function SettingsPage() {
     const { t } = useLanguage();
@@ -146,6 +147,8 @@ export default function SettingsPage() {
                             </div>
                         </label>
                     )}
+
+                    <ApiTokens />
 
                     {/* Danger Zone */}
                     <div className="mt-6 bg-card rounded-xl border border-destructive/30 overflow-hidden">

@@ -1,4 +1,4 @@
-import { ScheduleItem, ScheduleStatus, ScheduleSubtask } from "@/types";
+import { ScheduleItem, ScheduleRefine, ScheduleStatus, ScheduleSubtask } from "@/types";
 
 // A card whose subtasks are all checked moves itself to Done, and back out the moment one is reopened
 // or a new one is added. Cards with no subtasks are left alone — nothing to infer from, so their column
@@ -91,4 +91,32 @@ export function formatDaySummary(
         return lines.join("\n");
     });
     return [`*${header}*`, ...blocks].join("\n\n");
+}
+
+// schedule_items row (snake_case) -> ScheduleItem. Shared by the client api and the /api/v1 routes.
+export function mapScheduleItem(s: any): ScheduleItem {
+    return {
+        id: s.id,
+        organizationId: s.organization_id,
+        scope: s.scope,
+        status: s.status,
+        title: s.title,
+        description: s.description || undefined,
+        date: s.date || null,
+        assigneeId: s.assignee_id,
+        assignee: s.assignee ? { ...s.assignee, avatarUrl: s.assignee.avatar_url, createdAt: s.assignee.created_at } : undefined,
+        subtasks: Array.isArray(s.subtasks) ? s.subtasks : [],
+        refine: s.refine ?? null,
+        position: s.position ?? 0,
+        createdAt: s.created_at
+    };
+}
+
+// "Approve and send to agent": queues the refine's proposed subtasks that are still open and untouched.
+// The caller also clears the card's refine. Shared by the card UI and POST /api/v1/schedule/:id/approve.
+export function approveRefine(subtasks: ScheduleSubtask[], refine: ScheduleRefine, memberId: string, now = new Date().toISOString()): ScheduleSubtask[] {
+    const ids = new Set(refine.subtaskIds ?? []);
+    return subtasks.map((s) =>
+        ids.has(s.id) && !s.done && !s.agent ? { ...s, agent: { status: "queued" as const, requestedBy: memberId, updatedAt: now } } : s
+    );
 }

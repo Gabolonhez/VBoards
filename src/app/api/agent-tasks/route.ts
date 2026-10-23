@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
 import { ScheduleSubtask } from "@/types";
 import { pendingRefines } from "@/lib/server/refine";
-import { checkAuth, serviceClient, findMembers } from "@/lib/server/integration";
+import { agentCaller, fail, serviceClient, findMembers } from "@/lib/server/integration";
 
 // AgenticOffice polls this for the subtasks the given user queued for an agent.
 export async function GET(req: Request) {
-    const denied = checkAuth(req);
-    if (denied) return denied;
+    const caller = await agentCaller(req, new URL(req.url).searchParams.get("email"));
+    if (caller instanceof Response) return caller;
 
-    const email = (new URL(req.url).searchParams.get("email") ?? "").trim().toLowerCase();
+    const email = caller.email;
     if (!email) return NextResponse.json({ error: "email is required" }, { status: 400 });
 
     const supabase = serviceClient();
-    const { members, error: membersError } = await findMembers(supabase, email);
-    if (membersError) return NextResponse.json({ error: membersError }, { status: 500 });
+    const { members, error: membersError } = await findMembers(supabase, caller.userId);
+    if (membersError) return fail(membersError, 500);
     if (!members.length) return NextResponse.json({ tasks: [], refines: [] });
     const ids = new Set(members.map((m) => m.id));
 
@@ -21,7 +21,7 @@ export async function GET(req: Request) {
         .from("schedule_items")
         .select("id, title, description, date, subtasks, refine")
         .in("organization_id", members.map((m) => m.organization_id));
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return fail(error.message, 500);
 
     const tasks = (cards ?? []).flatMap((c) =>
         (Array.isArray(c.subtasks) ? (c.subtasks as ScheduleSubtask[]) : [])

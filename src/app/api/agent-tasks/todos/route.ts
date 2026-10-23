@@ -2,16 +2,15 @@ import { NextResponse } from "next/server";
 import { autoStatus } from "@/lib/schedule";
 import { todayInBrazil } from "@/lib/utils";
 import { ScheduleItem, ScheduleSubtask } from "@/types";
-import { checkAuth, serviceClient, findMembers, findDayCard } from "@/lib/server/integration";
+import { agentCaller, fail, serviceClient, findMembers, findDayCard } from "@/lib/server/integration";
 
 // Mirrors what the user's agents worked on (one item per conversation, with the agent's closing summary) onto the
 // repo's day card, for members who turned on work logging in Settings.
 export async function POST(req: Request) {
-    const denied = checkAuth(req);
-    if (denied) return denied;
-
     const body = await req.json().catch(() => null);
-    const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    const caller = await agentCaller(req, body?.email);
+    if (caller instanceof Response) return caller;
+    const email = caller.email;
     const repo = typeof body?.repo === "string" ? body.repo.trim() : "";
     const raw = body?.todos;
     if (!email || !repo || !Array.isArray(raw) || raw.length > 50) {
@@ -30,13 +29,13 @@ export async function POST(req: Request) {
     }
 
     const supabase = serviceClient();
-    const { members, error: membersError } = await findMembers(supabase, email);
-    if (membersError) return NextResponse.json({ error: membersError }, { status: 500 });
+    const { members, error: membersError } = await findMembers(supabase, caller.userId);
+    if (membersError) return fail(membersError, 500);
     const enabled = members.filter((m) => m.commit_log);
     if (!enabled.length) return NextResponse.json({ skipped: "commit log is off" });
 
     const { card, error: cardsError } = await findDayCard(supabase, enabled, repo);
-    if (cardsError) return NextResponse.json({ error: cardsError }, { status: 500 });
+    if (cardsError) return fail(cardsError, 500);
     if (!card) return NextResponse.json({ skipped: `no day card titled "${repo}"` });
 
     const today = todayInBrazil();
@@ -68,7 +67,7 @@ export async function POST(req: Request) {
     const status = autoStatus({ status: card.status } as ScheduleItem, next) ?? card.status;
     // shortcut: read-modify-write of the jsonb array, so a UI edit in the same instant can be lost; switch to an RPC if it ever bites
     const { error } = await supabase.from("schedule_items").update({ subtasks: next, status }).eq("id", card.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return fail(error.message, 500);
 
     return NextResponse.json({ card: card.title, added, completed });
 }

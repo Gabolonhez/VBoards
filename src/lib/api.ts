@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { Task, Version, Project, Doc, TaskStatus, TeamMember, Organization, ScheduleItem, ScheduleStatus, ScheduleNote } from "@/types";
+import { mapScheduleItem } from "@/lib/schedule";
 
 const supabase = createClient();
 
@@ -444,25 +445,24 @@ export async function inviteMember(email: string, role: string, organizationId: 
     }
 }
 
-// Schedule (Cronograma)
-function mapScheduleItem(s: any): ScheduleItem {
-    return {
-        id: s.id,
-        organizationId: s.organization_id,
-        scope: s.scope,
-        status: s.status,
-        title: s.title,
-        description: s.description || undefined,
-        date: s.date || null,
-        assigneeId: s.assignee_id,
-        assignee: s.assignee ? { ...s.assignee, avatarUrl: s.assignee.avatar_url, createdAt: s.assignee.created_at } : undefined,
-        subtasks: Array.isArray(s.subtasks) ? s.subtasks : [],
-        refine: s.refine ?? null,
-        position: s.position ?? 0,
-        createdAt: s.created_at
-    };
+// Invitations for the logged-in user's email (RPCs in supabase/fix_org_members_insert.sql). Accepting is an explicit
+// click: it joins organization_members and links the invite's team_members placeholder to the user.
+export async function getPendingInvitations(): Promise<{ id: string; organizationId: string; organizationName: string }[]> {
+    const { data, error } = await supabase.rpc("pending_invitations");
+    if (error) throw error;
+    return (data ?? []).map((i: { id: string; organization_id: string; organization_name: string }) => ({
+        id: i.id,
+        organizationId: i.organization_id,
+        organizationName: i.organization_name
+    }));
 }
 
+export async function acceptInvitation(id: string): Promise<void> {
+    const { error } = await supabase.rpc("accept_invitation", { p_invitation_id: id });
+    if (error) throw error;
+}
+
+// Schedule (Cronograma)
 export async function getScheduleItems(organizationId: string): Promise<ScheduleItem[]> {
     const { data, error } = await supabase
         .from("schedule_items")

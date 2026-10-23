@@ -82,7 +82,7 @@ export const config = {
          * - favicon.ico (favicon file)
          * Feel free to modify this pattern to include more paths.
          */
-        // api/agent-tasks is called by AgenticOffice with its own secret, not a user session
-        '/((?!_next/static|_next/image|favicon.ico|api/agent-tasks|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+        // api/agent-tasks and api/v1 authenticate by bearer token, api/whatsapp by HMAC signature, openapi.json is public: no user session
+        '/((?!_next/static|_next/image|favicon.ico|api/agent-tasks|api/v1/|api/whatsapp/|openapi\\.json$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
     ],
 }

@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn, todayInBrazil } from "@/lib/utils";
+import { approveRefine as approvedSubtasks } from "@/lib/schedule";
 import { useLanguage } from "@/context/language-context";
 import {
     DropdownMenu,
@@ -248,14 +249,7 @@ export function ScheduleCard({ item, members, onUpdate, onDelete, selected, onTo
     };
     const approveRefine = () => {
         if (!me || !refine) return;
-        const ids = new Set(refine.subtaskIds ?? []);
-        const now = new Date().toISOString();
-        onUpdate(item.id, {
-            subtasks: subtasks.map((s) =>
-                ids.has(s.id) && !s.done && !s.agent ? { ...s, agent: { status: "queued" as const, requestedBy: me.id, updatedAt: now } } : s
-            ),
-            refine: null,
-        });
+        onUpdate(item.id, { subtasks: approvedSubtasks(subtasks, refine, me.id), refine: null });
     };
 
     const updateSubtaskText = (subId: string, text: string) => {
