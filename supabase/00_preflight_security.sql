@@ -101,7 +101,7 @@ BEGIN
     IF to_regclass('public.api_tokens') IS NOT NULL AND EXISTS (
         SELECT 1 FROM pg_constraint WHERE conname = 'api_tokens_scopes_valid' AND conrelid = to_regclass('public.api_tokens')
           AND pg_get_constraintdef(oid) NOT LIKE '%read%write%agent%') THEN
-        problems := problems || 'api_tokens_scopes_valid já existe com outra definição (o arquivo 4 não a recria)';
+        problems := problems || 'api_tokens_scopes_valid já existe com outra definição (o arquivo 4 não a recria)'::text;
     END IF;
 
     -- 4. organization_members.role precisa aceitar 'member' (accept_invitation) e 'owner' (createOrganization)
@@ -131,10 +131,10 @@ BEGIN
     END IF;
 
     -- 5. accept_invitation copia organization_invitations.role para team_members.role
-    SELECT format_type(a.atttypid, a.atttypmod) || ':' || ty.typcategory INTO tm_role
+    SELECT format_type(a.atttypid, a.atttypmod) || ':' || ty.typcategory::text INTO tm_role
     FROM pg_attribute a JOIN pg_type ty ON ty.oid = a.atttypid
     WHERE a.attrelid = to_regclass('public.team_members') AND a.attname = 'role' AND NOT a.attisdropped;
-    SELECT format_type(a.atttypid, a.atttypmod) || ':' || ty.typcategory INTO inv_role
+    SELECT format_type(a.atttypid, a.atttypmod) || ':' || ty.typcategory::text INTO inv_role
     FROM pg_attribute a JOIN pg_type ty ON ty.oid = a.atttypid
     WHERE a.attrelid = to_regclass('public.organization_invitations') AND a.attname = 'role' AND NOT a.attisdropped;
     IF tm_role IS NOT NULL AND inv_role IS NOT NULL AND tm_role NOT LIKE '%:S' AND tm_role <> inv_role THEN
@@ -143,16 +143,18 @@ BEGIN
 
     -- 6. Funções que os arquivos usam / criam. CREATE OR REPLACE não troca tipo de retorno nem nome de parâmetro.
     IF to_regprocedure('public.check_is_org_member(uuid)') IS NULL THEN
-        problems := problems || 'função public.check_is_org_member(uuid) não existe (rls_policies.sql)';
+        problems := problems || 'função public.check_is_org_member(uuid) não existe (rls_policies.sql)'::text;
     END IF;
     -- (to_regprocedure e não 'x'::regprocedure: o cast de literal é resolvido no parse e falharia se não existir)
     IF pg_get_function_result(to_regprocedure('public.pending_invitations()')) <> 'TABLE(id uuid, organization_id uuid, organization_name text)' THEN
         problems := problems || format('public.pending_invitations() já existe com outro retorno: %s',
             pg_get_function_result(to_regprocedure('public.pending_invitations()')));
     END IF;
-    IF pg_get_function_arguments(to_regprocedure('public.accept_invitation(uuid)')) <> 'p_invitation_id uuid'
-       OR pg_get_function_result(to_regprocedure('public.accept_invitation(uuid)')) <> 'uuid' THEN
-        problems := problems || 'public.accept_invitation(uuid) já existe com outra assinatura';
+    -- (token_input uuid) -> void é a versão antiga criada fora do repo: o arquivo 1 guarda a definição e a remove
+    IF pg_get_function_arguments(to_regprocedure('public.accept_invitation(uuid)')) NOT IN ('p_invitation_id uuid', 'token_input uuid')
+       OR (pg_get_function_arguments(to_regprocedure('public.accept_invitation(uuid)')) = 'p_invitation_id uuid'
+           AND pg_get_function_result(to_regprocedure('public.accept_invitation(uuid)')) <> 'uuid') THEN
+        problems := problems || format('public.accept_invitation(uuid) já existe com outra assinatura: (%s) -> %s', pg_get_function_arguments(to_regprocedure('public.accept_invitation(uuid)')), pg_get_function_result(to_regprocedure('public.accept_invitation(uuid)')));
     END IF;
     FOR r IN SELECT * FROM (VALUES ('public.my_confirmed_email()', 'text'), ('public.is_org_owner(uuid)', 'boolean'),
                                    ('public.guard_team_member_link()', 'trigger'), ('public.guard_agent_requested_by()', 'trigger')) AS t(sig, ret) LOOP
@@ -170,9 +172,11 @@ BEGIN
       AND (
           (tablename = 'organization_members' AND cmd <> 'SELECT'
               AND policyname NOT IN ('Authenticated users can join organizations', 'Owners can manage members',
-                                     'Owners can add themselves', 'Owners can remove members', 'Users can join as owner or invitee'))
+                                     'Owners can add themselves', 'Owners can remove members', 'Users can join as owner or invitee',
+                                     'Users can insert organization members'))
        OR (tablename = 'organizations' AND cmd IN ('INSERT', 'UPDATE', 'ALL')
-              AND policyname NOT IN ('Authenticated users can create organizations', 'Owners can update their organizations'))
+              AND policyname NOT IN ('Authenticated users can create organizations', 'Owners can update their organizations',
+                                     'Users can insert organizations'))
       );
     IF dump IS NOT NULL THEN
         problems := problems || (E'policies de escrita com nomes desconhecidos (o arquivo 1 não as remove):\n  ' || dump);

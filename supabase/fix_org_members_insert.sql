@@ -71,8 +71,9 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, p
     SELECT EXISTS (SELECT 1 FROM public.organizations WHERE id = org_id AND owner_id = auth.uid())
 $$;
 
--- 2. organization_members
+-- 2. organization_members ("Users can insert organization members" foi criada direto no banco, fora do repo: mesmo buraco)
 DROP POLICY IF EXISTS "Authenticated users can join organizations" ON public.organization_members;
+DROP POLICY IF EXISTS "Users can insert organization members" ON public.organization_members;
 DROP POLICY IF EXISTS "Owners can manage members" ON public.organization_members;
 DROP POLICY IF EXISTS "Users can join as owner or invitee" ON public.organization_members; -- nome de uma versão anterior deste arquivo
 
@@ -89,6 +90,7 @@ DROP FUNCTION IF EXISTS public.has_pending_invitation(uuid); -- versão anterior
 
 -- 3. organizations: só cria org em nome próprio
 DROP POLICY IF EXISTS "Authenticated users can create organizations" ON public.organizations;
+DROP POLICY IF EXISTS "Users can insert organizations" ON public.organizations; -- criada fora do repo, mesmo WITH CHECK aberto
 CREATE POLICY "Authenticated users can create organizations" ON public.organizations
 FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
 
@@ -111,9 +113,10 @@ BEGIN
     IF TG_OP = 'INSERT' AND NEW.user_id IS NULL THEN
         RETURN NEW; -- placeholder de convite / membro sem conta
     END IF;
+    -- Só o próprio user_id. Sem exigir e-mail igual: os triggers de organizations do banco (handle_new_org_member,
+    -- migrate/claim_orphaned_data, fora do repo) podem gravar linhas do dono com e-mail vazio, e o acesso é por user_id.
     IF NEW.user_id = auth.uid()
-       AND (TG_OP = 'INSERT' OR OLD.user_id IS NULL)
-       AND lower(NEW.email::text) = public.my_confirmed_email() THEN
+       AND (TG_OP = 'INSERT' OR OLD.user_id IS NULL) THEN
         RETURN NEW;
     END IF;
     RAISE EXCEPTION 'team_members.user_id can only be linked to yourself' USING ERRCODE = '42501';
@@ -127,6 +130,20 @@ CREATE TRIGGER guard_team_member_link
 
 -- 5. Convites: listar os meus pendentes e aceitar um (o banner da UI chama as duas). O e-mail vem de auth.users no
 --    servidor (my_confirmed_email), nunca de parâmetro.
+--    O banco tinha uma accept_invitation(token_input uuid) criada fora do repo (o app nunca a chamou). Mesmo tipo de
+--    argumento com outro nome não dá CREATE OR REPLACE: guarda a definição em backup.functions_20261024 e remove.
+DO $$
+BEGIN
+    IF to_regprocedure('public.accept_invitation(uuid)') IS NOT NULL
+       AND pg_get_function_arguments(to_regprocedure('public.accept_invitation(uuid)')) <> 'p_invitation_id uuid' THEN
+        CREATE SCHEMA IF NOT EXISTS backup;
+        CREATE TABLE IF NOT EXISTS backup.functions_20261024 (signature text, definition text, saved_at timestamptz DEFAULT now());
+        INSERT INTO backup.functions_20261024 (signature, definition)
+        VALUES ('public.accept_invitation(token_input uuid)', pg_get_functiondef(to_regprocedure('public.accept_invitation(uuid)')));
+        DROP FUNCTION public.accept_invitation(uuid);
+    END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION public.pending_invitations()
 RETURNS TABLE (id uuid, organization_id uuid, organization_name text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -134,6 +151,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
     FROM public.organization_invitations i
     JOIN public.organizations o ON o.id = i.organization_id
     WHERE lower(i.email::text) = public.my_confirmed_email()
+      AND i.accepted_at IS NULL AND (i.expires_at IS NULL OR i.expires_at > now())
       AND NOT EXISTS (
           SELECT 1 FROM public.organization_members m WHERE m.organization_id = i.organization_id AND m.user_id = auth.uid()
       )
@@ -151,10 +169,13 @@ BEGIN
     IF auth.uid() IS NULL OR mail IS NULL THEN
         RAISE EXCEPTION 'not authenticated or email not confirmed' USING ERRCODE = '42501';
     END IF;
-    SELECT * INTO inv FROM public.organization_invitations WHERE id = p_invitation_id AND lower(email::text) = mail;
+    SELECT * INTO inv FROM public.organization_invitations
+    WHERE id = p_invitation_id AND lower(email::text) = mail
+      AND accepted_at IS NULL AND (expires_at IS NULL OR expires_at > now());
     IF NOT FOUND THEN
         RAISE EXCEPTION 'invitation not found' USING ERRCODE = 'P0002';
     END IF;
+    UPDATE public.organization_invitations SET accepted_at = now() WHERE id = inv.id;
     IF NOT EXISTS (SELECT 1 FROM public.organization_members WHERE organization_id = inv.organization_id AND user_id = auth.uid()) THEN
         INSERT INTO public.organization_members (organization_id, user_id, role) VALUES (inv.organization_id, auth.uid(), 'member');
     END IF;
