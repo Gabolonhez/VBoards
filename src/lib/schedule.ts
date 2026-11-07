@@ -117,6 +117,6 @@ export function mapScheduleItem(s: any): ScheduleItem {
 export function approveRefine(subtasks: ScheduleSubtask[], refine: ScheduleRefine, memberId: string, now = new Date().toISOString()): ScheduleSubtask[] {
     const ids = new Set(refine.subtaskIds ?? []);
     return subtasks.map((s) =>
-        ids.has(s.id) && !s.done && !s.agent ? { ...s, agent: { status: "queued" as const, requestedBy: memberId, updatedAt: now } } : s
+        ids.has(s.id) && !s.done && !s.agent ? { ...s, agent: { status: "queued" as const, requestedBy: memberId, updatedAt: now, approvedAt: now } } : s
     );
 }

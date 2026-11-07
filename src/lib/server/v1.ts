@@ -4,6 +4,11 @@ import { ScheduleRefine, ScheduleSubtask } from "@/types";
 
 export const TASK_STATUSES = ["ideas", "backlog", "in_progress", "code_review", "done", "deployed"] as const;
 export const TASK_PRIORITIES = ["low", "medium", "high", "critical"] as const;
+export const TASK_ORIGINS = ["research"] as const;
+export const RISK_LEVELS = ["low", "medium", "high"] as const;
+// Pipeline steps the Habblaud runner reports (its JOURNAL_STAGES)
+export const PIPELINE_STAGES = ["queued", "running", "review", "pr", "ci_fail", "merged", "deployed", "failed", "discarded", "triaged", "ota_preview", "ota_production", "build", "submitted", "auto"] as const;
+export const TRIAGE_PRIORITIES = ["low", "med", "high"] as const;
 export const SCHEDULE_SCOPES = ["month", "week", "day"] as const;
 export const SCHEDULE_STATUSES = ["todo", "doing", "done"] as const;
 
@@ -51,6 +56,69 @@ const nonEmpty = <T extends object>(v: T): T => {
     return v;
 };
 
+/** https://github.com/<owner>/<repo>/pull/<n>, nothing else (the link is rendered/clicked by people). */
+export const isPrUrl = (v: unknown): v is string => {
+    if (typeof v !== "string" || v.length > 300) return false;
+    try {
+        const u = new URL(v);
+        return u.protocol === "https:" && u.hostname === "github.com" && !u.username && !u.port && /^\/[\w.-]+\/[\w.-]+\/pull\/\d+\/?$/.test(u.pathname);
+    } catch {
+        return false;
+    }
+};
+
+/** Optional `stage` / `prUrl` of POST /api/agent-tasks/update. */
+export const validateAgentExtras = (body: unknown): Result<{ stage?: string; prUrl?: string }> =>
+    validate(body, (get) => ({
+        stage: get("stage", oneOf(PIPELINE_STAGES), PIPELINE_STAGES.join("|")) as string | undefined,
+        prUrl: get("prUrl", isPrUrl, "an https://github.com/<owner>/<repo>/pull/<n> url") as string | undefined,
+    }));
+
+export interface Triage {
+    valid: boolean;
+    reason: string;
+    duplicateOf?: string;
+    alreadyDone?: boolean;
+    product?: string;
+    repo?: string;
+    priority?: (typeof TRIAGE_PRIORITIES)[number];
+    risk?: (typeof RISK_LEVELS)[number];
+    riskWhy?: string;
+    questions: string[];
+    at?: number;
+}
+/** Cleans the `triage` object Habblaud puts on a task: known keys only, strings bounded; null = invalid. */
+export function parseTriage(v: unknown): Triage | null {
+    if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+    const o = v as Record<string, unknown>;
+    const opt = (k: string, max: number): string | undefined | null => {
+        if (o[k] === undefined) return undefined;
+        return typeof o[k] === "string" && (o[k] as string).length <= max ? (o[k] as string).trim() || undefined : null;
+    };
+    const duplicateOf = opt("duplicateOf", 100), product = opt("product", 100), repo = opt("repo", 200), riskWhy = opt("riskWhy", 500);
+    const reason = opt("reason", 500);
+    if (typeof o.valid !== "boolean" || !reason || duplicateOf === null || product === null || repo === null || riskWhy === null) return null;
+    if (o.alreadyDone !== undefined && typeof o.alreadyDone !== "boolean") return null;
+    if (o.priority !== undefined && !oneOf(TRIAGE_PRIORITIES)(o.priority)) return null;
+    if (o.risk !== undefined && !oneOf(RISK_LEVELS)(o.risk)) return null;
+    if (o.at !== undefined && !Number.isFinite(o.at)) return null;
+    const questions = o.questions === undefined ? [] : o.questions;
+    if (!texts(10, 500)(questions)) return null;
+    return {
+        valid: o.valid,
+        reason,
+        ...(duplicateOf ? { duplicateOf } : {}),
+        ...(o.alreadyDone !== undefined ? { alreadyDone: o.alreadyDone as boolean } : {}),
+        ...(product ? { product } : {}),
+        ...(repo ? { repo } : {}),
+        ...(o.priority !== undefined ? { priority: o.priority as Triage["priority"] } : {}),
+        ...(o.risk !== undefined ? { risk: o.risk as Triage["risk"] } : {}),
+        ...(riskWhy ? { riskWhy } : {}),
+        questions: (questions as string[]).map((q) => q.trim()),
+        ...(o.at !== undefined ? { at: o.at as number } : {}),
+    };
+}
+
 export interface TaskCreate {
     title: string;
     description?: string;
@@ -58,6 +126,7 @@ export interface TaskCreate {
     status: (typeof TASK_STATUSES)[number];
     priority: (typeof TASK_PRIORITIES)[number];
     organizationId?: string;
+    origin?: (typeof TASK_ORIGINS)[number];
 }
 export const validateTaskCreate = (body: unknown): Result<TaskCreate> =>
     validate(body, (get) => ({
@@ -67,6 +136,7 @@ export const validateTaskCreate = (body: unknown): Result<TaskCreate> =>
         status: (get("status", oneOf(TASK_STATUSES), TASK_STATUSES.join("|")) ?? "ideas") as TaskCreate["status"],
         priority: (get("priority", oneOf(TASK_PRIORITIES), TASK_PRIORITIES.join("|")) ?? "medium") as TaskCreate["priority"],
         organizationId: get("organizationId", isUuid, UUID) as string | undefined,
+        origin: get("origin", oneOf(TASK_ORIGINS), TASK_ORIGINS.join("|")) as TaskCreate["origin"],
     }));
 
 export interface TaskPatch {
@@ -75,6 +145,7 @@ export interface TaskPatch {
     status?: TaskCreate["status"];
     priority?: TaskCreate["priority"];
     projectId?: string | null;
+    triage?: Triage;
 }
 export const validateTaskPatch = (body: unknown): Result<TaskPatch> =>
     validate(body, (get) =>
@@ -84,6 +155,7 @@ export const validateTaskPatch = (body: unknown): Result<TaskPatch> =>
             status: get("status", oneOf(TASK_STATUSES), TASK_STATUSES.join("|")) as TaskPatch["status"],
             priority: get("priority", oneOf(TASK_PRIORITIES), TASK_PRIORITIES.join("|")) as TaskPatch["priority"],
             projectId: get("projectId", orNull(isUuid), "a uuid or null") as string | null | undefined,
+            triage: get("triage", (x) => parseTriage(x) !== null, "an object {valid, reason, questions, ...} within limits") === undefined ? undefined : parseTriage(body && (body as Record<string, unknown>).triage)!,
         })
     );
 
@@ -147,6 +219,8 @@ export const mapTask = (t: Row) => ({
     projectId: t.project_id ?? null,
     organizationId: t.organization_id,
     versionId: t.version_id ?? null,
+    origin: t.origin ?? null,
+    triage: t.triage ?? null,
     assigneeId: t.assignee_id ?? null,
     createdAt: t.created_at,
     updatedAt: t.updated_at ?? null,

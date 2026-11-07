@@ -11,7 +11,7 @@ export async function POST(req: Request) {
 
     const parsed = validateRefineBody({ ...body, email: caller.email });
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
-    const { cardId, status, plan, questions, subtasks: proposed, error: failure } = parsed.value;
+    const { cardId, status, plan, questions, subtasks: proposed, risks, error: failure } = parsed.value;
 
     const supabase = serviceClient();
     const { members, error: membersError } = await findMembers(supabase, caller.userId);
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
     let update: Record<string, unknown>;
     let subtaskIds: string[] = refine.subtaskIds ?? [];
     if (status === "ready") {
-        const merged = mergeRefineReady(Array.isArray(card.subtasks) ? (card.subtasks as ScheduleSubtask[]) : [], refine, { plan, questions, subtasks: proposed });
+        const merged = mergeRefineReady(Array.isArray(card.subtasks) ? (card.subtasks as ScheduleSubtask[]) : [], refine, { plan, questions, subtasks: proposed, risks });
         subtaskIds = merged.refine.subtaskIds!;
         update = { subtasks: merged.subtasks, refine: merged.refine };
     } else {

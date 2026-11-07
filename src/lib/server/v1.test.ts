@@ -11,6 +11,9 @@ import {
     validateSubtasksBody,
     validateTaskCreate,
     validateTaskPatch,
+    validateAgentExtras,
+    parseTriage,
+    isPrUrl,
 } from "./v1";
 import { approveRefine } from "@/lib/schedule";
 import { ScheduleSubtask } from "@/types";
@@ -98,7 +101,7 @@ describe("newSubtasks / approveRefine", () => {
         ];
         const r = approveRefine(subs, { status: "ready", requestedBy: "m0", subtaskIds: ["p1", "p2", "p3"], updatedAt: "t" }, "m1", "now");
         expect(r.map((s) => s.agent?.status ?? null)).toEqual(["queued", null, "failed", null]);
-        expect(r[0].agent).toEqual({ status: "queued", requestedBy: "m1", updatedAt: "now" });
+        expect(r[0].agent).toEqual({ status: "queued", requestedBy: "m1", updatedAt: "now", approvedAt: "now" });
     });
 });
 
@@ -142,5 +145,34 @@ describe("inbox ack / db errors", () => {
         expect(dbError({ code: "23502", message: 'null value in column "project_id" of relation "tasks" violates not-null constraint' })).toEqual({ error: "projectId required", status: 400 });
         expect(dbError({ code: "23502", message: 'null value in column "x"' }).status).toBe(400);
         expect(dbError({ code: "XX000", message: "boom" })).toEqual({ error: "boom", status: 500 });
+    });
+});
+
+describe("validateAgentExtras / isPrUrl", () => {
+    it("accepts nothing, a stage, a github PR", () => {
+        expect(validateAgentExtras({})).toEqual({ ok: true, value: { stage: undefined, prUrl: undefined } });
+        expect(validateAgentExtras({ stage: "pr", prUrl: "https://github.com/a/b/pull/12" })).toMatchObject({ ok: true, value: { stage: "pr" } });
+    });
+    it("rejects unknown stage and non-github or non-PR urls", () => {
+        expect(validateAgentExtras({ stage: "nope" }).ok).toBe(false);
+        for (const u of ["http://github.com/a/b/pull/1", "https://evil.com/a/b/pull/1", "https://github.com.evil.com/a/b/pull/1", "https://x@github.com/a/b/pull/1", "https://github.com/a/b", "javascript:alert(1)", 5])
+            expect(isPrUrl(u)).toBe(false);
+    });
+});
+
+describe("parseTriage / task origin", () => {
+    const ok = { valid: false, reason: " dup ", duplicateOf: "t1", priority: "med", risk: "low", questions: ["q?"], at: 1, extra: "dropped" };
+    it("keeps known keys, trims, drops unknown", () => {
+        expect(parseTriage(ok)).toEqual({ valid: false, reason: "dup", duplicateOf: "t1", priority: "med", risk: "low", questions: ["q?"], at: 1 });
+    });
+    it("rejects bad shapes", () => {
+        for (const t of [null, [], { valid: "x", reason: "r" }, { valid: true }, { valid: true, reason: "r", risk: "extreme" }, { valid: true, reason: "r", questions: new Array(11).fill("q") }, { valid: true, reason: "r".repeat(501) }])
+            expect(parseTriage(t)).toBeNull();
+    });
+    it("PATCH accepts triage alone; create accepts origin research only", () => {
+        expect(validateTaskPatch({ triage: ok })).toMatchObject({ ok: true, value: { triage: { valid: false } } });
+        expect(validateTaskPatch({ triage: { valid: 1 } }).ok).toBe(false);
+        expect(validateTaskCreate({ title: "t", origin: "research" })).toMatchObject({ ok: true, value: { origin: "research" } });
+        expect(validateTaskCreate({ title: "t", origin: "x" }).ok).toBe(false);
     });
 });

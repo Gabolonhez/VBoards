@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     const parsed = validateTaskCreate(await req.json().catch(() => null));
     if (!parsed.ok) return fail(parsed.error, 400);
-    const { title, description, projectId, status, priority, organizationId } = parsed.value;
+    const { title, description, projectId, status, priority, organizationId, origin } = parsed.value;
 
     let orgId: string;
     if (projectId) {
@@ -52,6 +52,7 @@ export async function POST(req: Request) {
             description: description ?? null,
             status,
             priority,
+            ...(origin ? { origin } : {}),
             code: `TASK-${Math.floor(Math.random() * 10000)}`, // same scheme as createTask in src/lib/api.ts
         })
         .select("*")

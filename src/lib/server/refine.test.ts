@@ -61,3 +61,15 @@ describe("pendingRefines", () => {
         expect(out).toEqual([{ cardId: "1", cardTitle: "T1", date: "2026-01-01", description: "", subtasks: ["x"] }]);
     });
 });
+
+describe("refine risks", () => {
+    it("validates risks and applies them to the new subtasks in order", () => {
+        const v = validateRefineBody({ ...base, subtasks: ["a", "b"], risks: [{ risk: "high", riskWhy: " auth " }, { risk: "low" }] });
+        expect(v).toMatchObject({ ok: true, value: { risks: [{ risk: "high", riskWhy: "auth" }, { risk: "low" }] } });
+        expect(validateRefineBody({ ...base, risks: [{ risk: "huge" }] }).ok).toBe(false);
+        expect(validateRefineBody({ ...base, risks: "x" }).ok).toBe(false);
+        let n = 0;
+        const r = mergeRefineReady([], refine, { subtasks: ["a", "b"], questions: [], risks: [{ risk: "high", riskWhy: "auth" }] }, () => `n${++n}`, "now");
+        expect(r.subtasks).toEqual([{ id: "n1", text: "a", done: false, risk: "high", riskWhy: "auth" }, { id: "n2", text: "b", done: false }]);
+    });
+});

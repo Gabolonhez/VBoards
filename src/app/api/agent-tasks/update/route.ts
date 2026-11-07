@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { autoStatus } from "@/lib/schedule";
 import { todayInBrazil } from "@/lib/utils";
 import { ScheduleItem, ScheduleSubtask } from "@/types";
+import { validateAgentExtras } from "@/lib/server/v1";
 import { agentCaller, fail, serviceClient, findMembers } from "@/lib/server/integration";
 
 const STATUSES = ["running", "review", "done", "failed"] as const;
@@ -18,6 +19,9 @@ export async function POST(req: Request) {
     if (body.summary !== undefined && typeof body.summary !== "string") {
         return NextResponse.json({ error: "summary must be a string" }, { status: 400 });
     }
+    const extras = validateAgentExtras(body);
+    if (!extras.ok) return NextResponse.json({ error: extras.error }, { status: 400 });
+    const { stage, prUrl } = extras.value;
     const summary = typeof body.summary === "string" ? body.summary.trim().slice(0, 2000) : undefined;
 
     const supabase = serviceClient();
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
             : {
                   ...s,
                   ...(status === "done" ? { done: true, doneAt: today } : {}),
-                  agent: { ...sub.agent!, status, summary: summary ?? sub.agent!.summary, updatedAt: new Date().toISOString() },
+                  agent: { ...sub.agent!, status, summary: summary ?? sub.agent!.summary, stage: stage ?? sub.agent!.stage, prUrl: prUrl ?? sub.agent!.prUrl, updatedAt: new Date().toISOString() },
               }
     );
     const newStatus = status === "done" ? autoStatus({ status: card.status } as ScheduleItem, next) ?? card.status : card.status;

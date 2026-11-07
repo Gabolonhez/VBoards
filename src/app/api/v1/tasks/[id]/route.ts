@@ -11,13 +11,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const task = await scopedRow(ctx, "tasks", (await params).id);
     if (task instanceof Response) return task;
 
-    const { title, description, status, priority, projectId } = parsed.value;
+    const { title, description, status, priority, projectId, triage } = parsed.value;
     if (projectId) {
         const { data: project, error } = await ctx.supabase.from("projects").select("organization_id").eq("id", projectId).maybeSingle();
         if (error) return fail(error.message, 500);
         if (!project || project.organization_id !== task.organization_id) return fail("project not found", 404);
     }
-    const update: Record<string, unknown> = { title, description, status, priority, project_id: projectId };
+    const update: Record<string, unknown> = { title, description, status, priority, project_id: projectId, triage };
     Object.keys(update).forEach((k) => update[k] === undefined && delete update[k]);
 
     const { data, error } = await ctx.supabase.from("tasks").update(update).eq("id", task.id).select("*").single();

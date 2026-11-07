@@ -26,7 +26,7 @@ export async function GET(req: Request) {
     const tasks = (cards ?? []).flatMap((c) =>
         (Array.isArray(c.subtasks) ? (c.subtasks as ScheduleSubtask[]) : [])
             .filter((s) => s.agent?.status === "queued" && ids.has(s.agent.requestedBy))
-            .map((s) => ({ cardId: c.id, subtaskId: s.id, text: s.text, cardTitle: c.title, date: c.date }))
+            .map((s) => ({ cardId: c.id, subtaskId: s.id, text: s.text, cardTitle: c.title, date: c.date, risk: s.risk, riskWhy: s.riskWhy, approvedAt: s.agent!.approvedAt, stage: s.agent!.stage, prUrl: s.agent!.prUrl }))
     );
     return NextResponse.json({ tasks, refines: pendingRefines(cards ?? [], ids) });
 }

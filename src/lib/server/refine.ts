@@ -1,3 +1,4 @@
+import { RISK_LEVELS } from "./v1";
 import { ScheduleItem, ScheduleRefine, ScheduleSubtask } from "@/types";
 
 export const REFINE_STATUSES = ["running", "ready", "failed"] as const;
@@ -9,6 +10,7 @@ export interface RefineBody {
     plan?: string;
     questions: string[];
     subtasks: string[];
+    risks?: { risk: (typeof RISK_LEVELS)[number]; riskWhy?: string }[]; // one per subtask, same order
     error?: string;
 }
 
@@ -32,10 +34,25 @@ export function validateRefineBody(body: unknown): { ok: true; value: RefineBody
     if (!questions) return { ok: false, error: "questions must be up to 10 strings of up to 500 chars" };
     const subtasks = strList(b.subtasks, 20, 300);
     if (!subtasks) return { ok: false, error: "subtasks must be up to 20 strings of up to 300 chars" };
+    let risks: RefineBody["risks"];
+    if (b.risks !== undefined) {
+        const r = b.risks;
+        if (!Array.isArray(r) || r.length > 20) return { ok: false, error: "risks must be up to 20 objects {risk, riskWhy?}" };
+        risks = [];
+        for (const x of r) {
+            const o = (x ?? {}) as Record<string, unknown>;
+            if (!RISK_LEVELS.includes(o.risk as never) || (o.riskWhy !== undefined && (typeof o.riskWhy !== "string" || o.riskWhy.length > 300))) {
+                return { ok: false, error: "risks must be up to 20 objects {risk: low|medium|high, riskWhy?: string up to 300 chars}" };
+            }
+            const why = typeof o.riskWhy === "string" ? o.riskWhy.trim() : "";
+            risks.push({ risk: o.risk as (typeof RISK_LEVELS)[number], ...(why ? { riskWhy: why } : {}) });
+        }
+    }
     return {
         ok: true,
         value: {
             email,
+            ...(risks ? { risks } : {}),
             cardId: b.cardId,
             status: b.status as RefineBody["status"],
             plan: typeof b.plan === "string" ? b.plan.trim() : undefined,
@@ -50,12 +67,12 @@ export function validateRefineBody(body: unknown): { ok: true; value: RefineBody
 export function mergeRefineReady(
     subtasks: ScheduleSubtask[],
     refine: ScheduleRefine,
-    body: Pick<RefineBody, "plan" | "questions" | "subtasks">,
+    body: Pick<RefineBody, "plan" | "questions" | "subtasks" | "risks">,
     newId: () => string = () => crypto.randomUUID(),
     now = new Date().toISOString()
 ): { subtasks: ScheduleSubtask[]; refine: ScheduleRefine } {
     const old = new Set(refine.subtaskIds ?? []);
-    const added = body.subtasks.map((text) => ({ id: newId(), text, done: false }));
+    const added = body.subtasks.map((text, i) => ({ id: newId(), text, done: false, ...body.risks?.[i] }));
     return {
         subtasks: [...subtasks.filter((s) => !(old.has(s.id) && !s.done && !s.agent)), ...added],
         refine: {

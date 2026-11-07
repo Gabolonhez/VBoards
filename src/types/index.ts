@@ -99,8 +99,10 @@ export interface ScheduleSubtask {
   text: string;
   done: boolean;
   doneAt?: string | null; // YYYY-MM-DD (Brazil tz); absent on subtasks completed before this was tracked
-  agent?: { status: 'queued' | 'running' | 'review' | 'done' | 'failed'; requestedBy: string; summary?: string; updatedAt?: string }; // handed to a coding agent (AgenticOffice)
+  agent?: { status: 'queued' | 'running' | 'review' | 'done' | 'failed'; requestedBy: string; summary?: string; updatedAt?: string; stage?: string; prUrl?: string; approvedAt?: string }; // handed to a coding agent (AgenticOffice)
   source?: 'agent'; // created from an agent's todo list
+  risk?: 'low' | 'medium' | 'high'; // from the refine (Habblaud)
+  riskWhy?: string;
 }
 
 export interface ScheduleRefine {
