@@ -145,10 +145,25 @@ export async function v1Context(req: Request, scope: TokenScope, allowNoMembers 
     if (auth instanceof Response) return auth;
     const denied = needScope(auth, scope);
     if (denied) return denied;
-    const { members, error } = await findMembers(supabase, auth.userId);
+    return withMembers(supabase, auth, allowNoMembers);
+}
+
+async function withMembers(supabase: ServiceClient, caller: Caller, allowNoMembers = false): Promise<V1Context | NextResponse> {
+    const { members, error } = await findMembers(supabase, caller.userId);
     if (error) return fail(error, 500);
-    if (!members.length && !allowNoMembers) return fail("no team membership for this token's user", 404);
-    return { ...auth, supabase, members, orgIds: [...new Set(members.map((m) => m.organization_id))] };
+    if (!members.length && !allowNoMembers) return fail("no team membership for this user", 404);
+    return { ...caller, supabase, members, orgIds: [...new Set(members.map((m) => m.organization_id))] };
+}
+
+/**
+ * Human-only actions (approving a plan): a signed-in session, never an API token. Agents hold tokens (the Habblaud
+ * runner's `agent` token is readable by them), and the runner trusts `approvedAt` as proof a human approved.
+ */
+export async function humanContext(req: Request): Promise<V1Context | NextResponse> {
+    if (req.headers.get("authorization")) return fail("API tokens cannot approve; approve on the card while signed in", 403);
+    const user = await sessionUser();
+    if (!user) return fail("unauthorized", 401);
+    return withMembers(serviceClient(), { userId: user.id, email: user.email, scopes: [] });
 }
 
 /** The logged-in user (Supabase session cookie, verified by getUser), for the token management routes. */

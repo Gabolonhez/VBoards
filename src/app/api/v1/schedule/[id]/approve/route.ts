@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { approveRefine, autoStatus, mapScheduleItem } from "@/lib/schedule";
 import { ScheduleItem, ScheduleRefine, ScheduleSubtask } from "@/types";
-import { fail, memberIn, scopedRow, v1Context } from "@/lib/server/integration";
+import { fail, humanContext, memberIn, scopedRow } from "@/lib/server/integration";
 
 // "Aprovar e enviar ao agente": same as the card button (approveRefine), only on a refine that is ready.
+// Signed-in human only: approvedAt is the runner's proof of human approval, so no API token (not even `agent`) may set it.
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const ctx = await v1Context(req, "agent");
+    const ctx = await humanContext(req);
     if (ctx instanceof Response) return ctx;
 
     const card = await scopedRow(ctx, "schedule_items", (await params).id);

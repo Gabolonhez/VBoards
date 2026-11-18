@@ -3,7 +3,7 @@
   "info": {
     "title": "VBoards API",
     "version": "1.0.0",
-    "description": "Per-user API for agents (Jarvis). Create a token in Settings > API tokens. The token acts as its owner (the auth user who created it): every read and write is scoped to the organizations where that user is a member; rows elsewhere return 404. Tokens carry scopes: `read` (GET endpoints), `write` (create/patch tasks and cards, add subtasks without queue, request a refine), `agent` (work that runs on the owner's computer: POST subtasks with queue=true, approve, the Jarvis inbox, and the /api/agent-tasks routes of the local runner). A missing scope returns 403 {\"error\":\"missing scope <name>\"}. Tokens may expire (30/90/365 days or never)."
+    "description": "Per-user API for agents (Jarvis). Create a token in Settings > API tokens. The token acts as its owner (the auth user who created it): every read and write is scoped to the organizations where that user is a member; rows elsewhere return 404. Tokens carry scopes: `read` (GET endpoints), `write` (create/patch tasks and cards, add subtasks without queue, request a refine), `agent` (work that runs on the owner's computer: POST subtasks with queue=true, the Jarvis inbox, and the /api/agent-tasks routes of the local runner). Approving a plan (POST /schedule/{id}/approve) is not available to any token: it needs a signed-in session. A missing scope returns 403 {\"error\":\"missing scope <name>\"}. Tokens may expire (30/90/365 days or never)."
   },
   "servers": [
     {
@@ -827,7 +827,7 @@
     },
     "/schedule/{id}/approve": {
       "post": {
-        "summary": "Approve the ready refine: queue its open proposed subtasks and clear refine (409 if not ready)",
+        "summary": "Approve the ready refine: queue its open proposed subtasks (with approvedAt) and clear refine (409 if not ready). Signed-in human only",
         "parameters": [
           {
             "name": "id",
@@ -865,7 +865,14 @@
             "$ref": "#/components/responses/E401"
           },
           "403": {
-            "$ref": "#/components/responses/E403"
+            "description": "Any API token, `agent` scope included: {\"error\":\"API tokens cannot approve; approve on the card while signed in\"}",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/E404"
@@ -877,14 +884,8 @@
             "$ref": "#/components/responses/E500"
           }
         },
-        "security": [
-          {
-            "bearer": [
-              "agent"
-            ]
-          }
-        ],
-        "description": "Scope: `agent`."
+        "security": [],
+        "description": "Human gate: only a signed-in VBoards session (Supabase cookie, the card's \"Approve\" button). Requests with an Authorization header get 403, because the local runner trusts approvedAt as proof that a human approved the plan."
       }
     },
     "/summary": {

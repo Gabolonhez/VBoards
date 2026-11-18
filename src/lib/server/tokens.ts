@@ -44,7 +44,8 @@ export function validateTokenName(v: unknown): string | null {
 }
 
 // read = GETs; write = create/patch tasks & cards, subtasks without queue, refine request;
-// agent = work that runs on the user's machine (agent-tasks, queue=true, approve) and the Jarvis inbox.
+// agent = work that runs on the user's machine (agent-tasks, queue=true) and the Jarvis inbox.
+// No scope approves a refine plan: only a signed-in human does (humanContext in integration.ts).
 export const TOKEN_SCOPES = ["read", "write", "agent"] as const;
 export type TokenScope = (typeof TOKEN_SCOPES)[number];
 export const DEFAULT_SCOPES: TokenScope[] = ["read", "write"];
