@@ -9,7 +9,7 @@ const STATUSES = ["running", "review", "done", "failed"] as const;
 
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
-    const caller = await agentCaller(req, body?.email);
+    const caller = await agentCaller(req);
     if (caller instanceof Response) return caller;
     const email = caller.email;
     const { cardId, subtaskId, status } = body ?? {};

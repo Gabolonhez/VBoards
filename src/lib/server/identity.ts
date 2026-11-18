@@ -12,16 +12,3 @@ export function selectMembers<T extends { user_id: string | null; organization_i
     const orgs = new Set(memberOrgIds);
     return rows.filter((r) => r.user_id === userId && orgs.has(r.organization_id));
 }
-
-/**
- * Legacy auth (COMMIT_HOOK_SECRET + email): the auth user whose own email is exactly `email`, among the user ids of
- * team_members rows carrying that email. Each candidate is checked against auth.users, so a row whose email was
- * edited to someone else's cannot hand over that person's identity.
- */
-export async function pickLegacyUser(email: string, candidateIds: (string | null)[], authEmail: (id: string) => Promise<string | null>): Promise<string> {
-    if (!email) return "";
-    for (const id of new Set(candidateIds.filter((x): x is string => !!x))) {
-        if (normalizeEmail(await authEmail(id)) === email) return id;
-    }
-    return "";
-}

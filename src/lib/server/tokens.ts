@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 // Per-user API tokens (Settings → API tokens). Only the sha256 is stored; the plain token is shown once.
 export const TOKEN_PREFIX = "vb_";
@@ -13,21 +13,6 @@ export const looksLikeToken = (token: string) => /^vb_[A-Za-z0-9_-]{43}$/.test(t
 export function bearer(req: Request): string {
     const h = req.headers.get("authorization") ?? "";
     return h.startsWith("Bearer ") ? h.slice(7).trim() : "";
-}
-
-// Hashing both sides first gives equal lengths, which timingSafeEqual requires
-export const safeEqual = (a: string, b: string) =>
-    timingSafeEqual(createHash("sha256").update(a).digest(), createHash("sha256").update(b).digest());
-
-/**
- * Which credential an agent-tasks request carries. The legacy COMMIT_HOOK_SECRET is compared first (constant time),
- * so a legacy secret that happens to start with vb_ keeps working; only then is a vb_ token looked up.
- */
-export function agentAuthKind(authorization: string | null, legacySecret: string | undefined): "legacy" | "token" | "none" {
-    const header = authorization ?? "";
-    if (legacySecret && safeEqual(header, `Bearer ${legacySecret}`)) return "legacy";
-    if (header.startsWith(`Bearer ${TOKEN_PREFIX}`)) return "token";
-    return "none";
 }
 
 /** last_used_at is written at most once per minute per token. */

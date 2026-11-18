@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-    agentAuthKind,
     bearer,
     expiryFor,
     hashToken,
     looksLikeToken,
     missingScope,
     newToken,
-    safeEqual,
     shouldTouch,
     tokenUsable,
     validateScopes,
@@ -32,11 +30,6 @@ describe("tokens", () => {
         expect(bearer(new Request("http://x", { headers: { authorization: "Basic abc" } }))).toBe("");
         expect(bearer(new Request("http://x"))).toBe("");
     });
-    it("compares in constant time regardless of length", () => {
-        expect(safeEqual("Bearer s", "Bearer s")).toBe(true);
-        expect(safeEqual("Bearer s", "Bearer s2")).toBe(false);
-        expect(safeEqual("", "x")).toBe(false);
-    });
     it("touches last_used_at at most once per minute", () => {
         const now = Date.parse("2026-10-23T12:00:00Z");
         expect(shouldTouch(null, now)).toBe(true);
@@ -48,16 +41,6 @@ describe("tokens", () => {
         expect(validateTokenName("")).toBeNull();
         expect(validateTokenName("x".repeat(101))).toBeNull();
         expect(validateTokenName(3)).toBeNull();
-    });
-    it("agent-tasks: legacy secret wins first, even when it starts with vb_", () => {
-        const vbSecret = "vb_" + "a".repeat(43);
-        expect(agentAuthKind(`Bearer ${vbSecret}`, vbSecret)).toBe("legacy");
-        expect(agentAuthKind("Bearer hook", "hook")).toBe("legacy");
-        expect(agentAuthKind(`Bearer ${vbSecret}`, "hook")).toBe("token");
-        expect(agentAuthKind(`Bearer ${vbSecret}`, undefined)).toBe("token");
-        expect(agentAuthKind("Bearer wrong", "hook")).toBe("none");
-        expect(agentAuthKind(null, "hook")).toBe("none");
-        expect(agentAuthKind("Bearer ", "")).toBe("none");
     });
 });
 

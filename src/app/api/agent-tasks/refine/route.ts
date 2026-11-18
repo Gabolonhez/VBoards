@@ -6,7 +6,7 @@ import { validateRefineBody, mergeRefineReady } from "@/lib/server/refine";
 // AgenticOffice reports progress/result of a "refine with agent" request here.
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
-    const caller = await agentCaller(req, body?.email);
+    const caller = await agentCaller(req);
     if (caller instanceof Response) return caller;
 
     const parsed = validateRefineBody({ ...body, email: caller.email });

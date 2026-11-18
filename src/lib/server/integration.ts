@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { todayInBrazil } from "@/lib/utils";
 import { createClient as sessionClient } from "@/lib/supabase/server";
-import { agentAuthKind, bearer, hashToken, looksLikeToken, missingScope, shouldTouch, TOKEN_SCOPES, tokenUsable, type TokenScope } from "@/lib/server/tokens";
-import { normalizeEmail, pickLegacyUser, selectMembers } from "@/lib/server/identity";
+import { bearer, hashToken, looksLikeToken, missingScope, shouldTouch, tokenUsable, type TokenScope } from "@/lib/server/tokens";
+import { normalizeEmail, selectMembers } from "@/lib/server/identity";
 import { isUuid } from "@/lib/server/v1";
 
-// Shared by the machine-to-machine routes (git hook, AgenticOffice): no user session, so they authenticate
-// by shared secret and write with the service role key.
+// Shared by the machine-to-machine routes (AgenticOffice/Habblaud, API v1): no user session, so they authenticate
+// by per-user vb_ token and write with the service role key.
 export const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 /** JSON error. A 500's detail (DB messages etc.) is only logged; the client gets "internal error". */
@@ -17,13 +17,6 @@ export function fail(error: string, status: number) {
         error = "internal error";
     }
     return NextResponse.json({ error }, { status });
-}
-
-export function checkAuth(req: Request): NextResponse | null {
-    if (agentAuthKind(req.headers.get("authorization"), process.env.COMMIT_HOOK_SECRET) !== "legacy") {
-        return fail("unauthorized", 401);
-    }
-    return null;
 }
 
 export function serviceClient() {
@@ -105,28 +98,13 @@ export function needScope(caller: Pick<Caller, "scopes">, scope: TokenScope): Ne
 }
 
 /**
- * agent-tasks routes: a vb_ token with the `agent` scope (identity comes from it, the email param is ignored) or the
- * legacy COMMIT_HOOK_SECRET + email param. Legacy email -> the auth user whose own email it is (exact match, verified
- * against auth.users); no such user = userId "" (no members, so nothing is returned or written).
+ * agent-tasks routes: a vb_ token with the `agent` scope; identity comes from it (an `email` param is ignored).
+ * The legacy COMMIT_HOOK_SECRET + email (any email = that user) is gone: it is 401 like any other non-token.
  */
-export async function agentCaller(req: Request, email: unknown): Promise<Caller | NextResponse> {
-    const kind = agentAuthKind(req.headers.get("authorization"), process.env.COMMIT_HOOK_SECRET);
-    if (kind === "token") {
-        const caller = await authenticate(req);
-        if (caller instanceof Response) return caller;
-        return needScope(caller, "agent") ?? caller;
-    }
-    if (kind !== "legacy") return fail("unauthorized", 401);
-    const normalized = normalizeEmail(email);
-    if (!normalized) return { userId: "", email: "", scopes: TOKEN_SCOPES };
-    const supabase = serviceClient();
-    const { data, error } = await supabase.from("team_members").select("user_id").eq("email", normalized).not("user_id", "is", null);
-    if (error) return fail(error.message, 500);
-    const userId = await pickLegacyUser(normalized, (data ?? []).map((r) => r.user_id), async (id) => {
-        const { data: u } = await supabase.auth.admin.getUserById(id);
-        return u.user?.email ?? null;
-    });
-    return { userId, email: normalized, scopes: TOKEN_SCOPES };
+export async function agentCaller(req: Request): Promise<Caller | NextResponse> {
+    const caller = await authenticate(req);
+    if (caller instanceof Response) return caller;
+    return needScope(caller, "agent") ?? caller;
 }
 
 export interface V1Context extends Caller {

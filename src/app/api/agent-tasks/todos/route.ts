@@ -8,7 +8,7 @@ import { agentCaller, fail, serviceClient, findMembers, findDayCard } from "@/li
 // repo's day card, for members who turned on work logging in Settings.
 export async function POST(req: Request) {
     const body = await req.json().catch(() => null);
-    const caller = await agentCaller(req, body?.email);
+    const caller = await agentCaller(req);
     if (caller instanceof Response) return caller;
     const email = caller.email;
     const repo = typeof body?.repo === "string" ? body.repo.trim() : "";

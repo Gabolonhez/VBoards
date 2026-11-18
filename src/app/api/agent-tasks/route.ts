@@ -5,7 +5,7 @@ import { agentCaller, fail, serviceClient, findMembers } from "@/lib/server/inte
 
 // AgenticOffice polls this for the subtasks the given user queued for an agent.
 export async function GET(req: Request) {
-    const caller = await agentCaller(req, new URL(req.url).searchParams.get("email"));
+    const caller = await agentCaller(req);
     if (caller instanceof Response) return caller;
 
     const email = caller.email;
